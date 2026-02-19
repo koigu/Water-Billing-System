@@ -16,11 +16,17 @@ export default function LoginPage({ onLogin }) {
 
     try {
       const response = await apiPost('/api/admin/login', { username, password })
+      const token = response.token || response.access_token
+
+      if (!token) {
+        throw new Error('Login succeeded but no token was returned')
+      }
+
       if (response.message === 'Login successful') {
         // Store auth state and token in localStorage
         localStorage.setItem('is_admin', 'true')
-        localStorage.setItem('username', response.username)
-        localStorage.setItem('token', response.token)
+        localStorage.setItem('username', response.username || username)
+        localStorage.setItem('token', token)
         // Call onLogin to update parent state and trigger navigation
         if (onLogin) {
           onLogin()
@@ -28,7 +34,7 @@ export default function LoginPage({ onLogin }) {
         navigate('/admin/dashboard')
       }
     } catch (err) {
-      setError('Invalid credentials')
+      setError(err.message || 'Invalid credentials')
     } finally {
       setLoading(false)
     }

@@ -6,10 +6,10 @@ Supports SMS and WhatsApp notifications.
 
 Usage:
     from app.notify import send_sms, send_email, send_invoice_message
-    
+
     # Simple SMS
     send_sms("+254712345678", "Your bill is ready")
-    
+
     # Send invoice
     send_invoice_message(customer, invoice, method="all")
 """
@@ -28,21 +28,35 @@ logger = logging.getLogger("notify")
 # Default provider is Africa's Talking
 DEFAULT_PROVIDER = "africas_talking"
 
+
 def _init_notification_manager():
     """Initialize the notification manager from environment variables."""
     primary = os.getenv("SMS_PROVIDER", DEFAULT_PROVIDER).lower()
     fallback = os.getenv("SMS_FALLBACK_PROVIDER", None)
-    
+
     if fallback:
         fallback = fallback.lower() if fallback else None
-    
+
     try:
         return NotificationManager(primary, fallback)
     except Exception as e:
         logger.error(f"Failed to initialize notification manager: {e}")
         return None
 
+
 notification_manager = _init_notification_manager()
+_notification_unavailable_logged = False
+
+
+def _manager_available() -> bool:
+    """Check manager availability and log only once when disabled."""
+    global _notification_unavailable_logged
+    if notification_manager is not None:
+        return True
+    if not _notification_unavailable_logged:
+        logger.warning("Notification manager not initialized; notifications are disabled.")
+        _notification_unavailable_logged = True
+    return False
 
 
 # ==================== Backward Compatibility Functions ====================
@@ -50,18 +64,17 @@ notification_manager = _init_notification_manager()
 def send_sms(to_number: str, body: str) -> bool:
     """
     Send SMS message using the configured provider.
-    
+
     Args:
         to_number: Recipient phone number
         body: Message body
-        
+
     Returns:
         True if sent successfully, False otherwise
     """
-    if notification_manager is None:
-        logger.error("Notification manager not initialized")
+    if not _manager_available():
         return False
-    
+
     result = notification_manager.send_sms(to_number, body)
     return result.get("success", False)
 
@@ -69,19 +82,18 @@ def send_sms(to_number: str, body: str) -> bool:
 def send_email(to_email: str, subject: str, body: str) -> bool:
     """
     Send email message using the configured provider.
-    
+
     Args:
         to_email: Recipient email address
         subject: Email subject
         body: Email body
-        
+
     Returns:
         True if sent successfully, False otherwise
     """
-    if notification_manager is None:
-        logger.error("Notification manager not initialized")
+    if not _manager_available():
         return False
-    
+
     result = notification_manager.send_email(to_email, subject, body)
     return result.get("success", False)
 
@@ -89,18 +101,17 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
 def send_whatsapp(to_number: str, body: str) -> bool:
     """
     Send WhatsApp message using the configured provider.
-    
+
     Args:
         to_number: Recipient WhatsApp number
         body: Message body
-        
+
     Returns:
         True if sent successfully, False otherwise
     """
-    if notification_manager is None:
-        logger.error("Notification manager not initialized")
+    if not _manager_available():
         return False
-    
+
     result = notification_manager.send_whatsapp(to_number, body)
     return result.get("success", False)
 
@@ -112,47 +123,55 @@ def send_invoice_message(
 ) -> bool:
     """
     Send invoice to customer via specified method.
-    
+
     Args:
         customer: Customer object with email, phone attributes
         invoice: Invoice object with id, amount, due_date, status, location
         method: Delivery method ("email", "sms", "whatsapp", or "all")
-        
+
     Returns:
         bool: True if at least one delivery method succeeded
     """
-    if notification_manager is None:
-        logger.error("Notification manager not initialized")
+    if not _manager_available():
         return False
-    
-    due = invoice.due_date
+
+    def get_value(obj, key, default=None):
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
+    due = get_value(invoice, "due_date")
     body = (
-        f"Invoice #{invoice.id}\n"
-        f"Amount: {invoice.amount}\n"
-        f"Location: {invoice.location or getattr(customer, 'location', '')}\n"
+        f"Invoice #{get_value(invoice, 'id')}\n"
+        f"Amount: {get_value(invoice, 'amount')}\n"
+        f"Location: {get_value(invoice, 'location') or get_value(customer, 'location', '')}\n"
         f"Due: {due}\n"
-        f"Status: {invoice.status}\n"
+        f"Status: {get_value(invoice, 'status')}\n"
     )
-    subject = f"Invoice #{invoice.id} - Amount {invoice.amount}"
+    subject = f"Invoice #{get_value(invoice, 'id')} - Amount {get_value(invoice, 'amount')}"
 
     sent_any = False
 
-    if method in ("email", "all") and getattr(customer, "email", None):
-        if send_email(customer.email, subject, body):
+    customer_email = get_value(customer, "email")
+    customer_phone = get_value(customer, "phone")
+    customer_id = get_value(customer, "id", "<no-id>")
+
+    if method in ("email", "all") and customer_email:
+        if send_email(customer_email, subject, body):
             sent_any = True
 
     # For SMS/WhatsApp: customer.phone should include country code
-    if method in ("sms", "all") and getattr(customer, "phone", None):
-        if send_sms(customer.phone, body):
+    if method in ("sms", "all") and customer_phone:
+        if send_sms(customer_phone, body):
             sent_any = True
 
-    if method == "whatsapp" and getattr(customer, "phone", None):
-        if send_whatsapp(customer.phone, body):
+    if method == "whatsapp" and customer_phone:
+        if send_whatsapp(customer_phone, body):
             sent_any = True
 
     if not sent_any:
         logger.info(
-            f"No delivery performed for customer {getattr(customer, 'id', '<no-id>')}; "
+            f"No delivery performed for customer {customer_id}; "
             f"would have sent via {method}"
         )
 
@@ -164,7 +183,7 @@ def send_invoice_message(
 def get_notification_status() -> dict:
     """
     Get the current notification provider status.
-    
+
     Returns:
         Dictionary with provider information
     """
@@ -175,7 +194,7 @@ def get_notification_status() -> dict:
             "fallback_provider": None,
             "status": "Not initialized"
         }
-    
+
     return {
         "initialized": True,
         "primary_provider": notification_manager.get_active_provider(),
@@ -187,31 +206,32 @@ def get_notification_status() -> dict:
 def check_provider_balance() -> dict:
     """
     Check the balance of the current provider.
-    
+
     Returns:
         Dictionary with balance information
     """
     if notification_manager is None:
         return {"success": False, "error": "Notification manager not initialized"}
-    
+
     return notification_manager.check_balance()
 
 
 def switch_provider(provider_name: str) -> bool:
     """
     Switch to a different notification provider at runtime.
-    
+
     Args:
         provider_name: Name of the provider to switch to
-        
+
     Returns:
         True if switch successful, False otherwise
     """
-    global notification_manager
-    
+    global notification_manager, _notification_unavailable_logged
+
     try:
         new_manager = NotificationManager(provider_name)
         notification_manager = new_manager
+        _notification_unavailable_logged = False
         logger.info(f"Switched to provider: {provider_name}")
         return True
     except Exception as e:
@@ -225,10 +245,9 @@ __all__ = [
     "send_email",
     "send_whatsapp",
     "send_invoice_message",
-    
+
     # Advanced functions
     "get_notification_status",
     "check_provider_balance",
     "switch_provider",
 ]
-

@@ -19,6 +19,9 @@ import csv
 import io
 import base64
 import os
+from typing import List, Optional
+from pydantic import BaseModel
+from bson import ObjectId
 
 load_dotenv()
 
@@ -66,6 +69,60 @@ def check_admin_auth(request: Request) -> bool:
             return True
     
     return False
+
+
+class CustomerUpdatePayload(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    location: Optional[str] = None
+
+
+class BulkCustomerDeletePayload(BaseModel):
+    customer_ids: List[int]
+
+
+class BulkInvoiceGeneratePayload(BaseModel):
+    customer_ids: List[int]
+
+
+class BulkReminderPayload(BaseModel):
+    invoice_ids: List[int]
+
+
+def serialize_mongo(data):
+    """Convert MongoDB ObjectId values to JSON-safe strings and drop internal _id keys."""
+    if isinstance(data, list):
+        return [serialize_mongo(item) for item in data]
+    if isinstance(data, dict):
+        return {
+            key: serialize_mongo(value)
+            for key, value in data.items()
+            if key != "_id"
+        }
+    if isinstance(data, ObjectId):
+        return str(data)
+    return data
+
+
+def generate_invoice_for_customer(customer_id: int):
+    """Generate an invoice for a customer and return (invoice, error_message)."""
+    rate = crud.get_effective_rate()
+    calc = crud.calculate_amount_from_readings(customer_id, rate)
+    if not calc:
+        return None, "Not enough readings to calculate invoice"
+
+    amount, billing_from, billing_to = calc
+    due_date = datetime.utcnow() + timedelta(days=15)
+    customer = crud.get_customer(customer_id)
+    if not customer:
+        return None, "Customer not found"
+
+    inv = crud.create_invoice(customer_id, amount, due_date, customer.get("location"))
+    if customer:
+        notify.send_invoice_message(customer, inv, method="all")
+    return inv, None
+
 
 # Mount static files
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "../static")), name="static")
@@ -355,7 +412,30 @@ def api_dashboard(request: Request):
     if not check_admin_auth(request):
         raise HTTPException(status_code=401, detail="Admin access required")
     stats = crud.get_dashboard_stats()
-    return stats
+    db = crud.get_db()
+
+    total_invoices = 0
+    pending_invoices = 0
+    overdue_invoices = 0
+    total_readings = 0
+    rate = crud.get_rate_config()
+    effective_rate = crud.get_effective_rate()
+
+    if db is not None:
+        total_invoices = db["invoices"].count_documents({})
+        pending_invoices = db["invoices"].count_documents({"status": "pending"})
+        overdue_invoices = db["invoices"].count_documents({"status": "overdue"})
+        total_readings = db["meter_readings"].count_documents({})
+
+    return {
+        "stats": stats,
+        "rate": serialize_mongo(rate),
+        "effective_rate": effective_rate,
+        "total_invoices": total_invoices,
+        "pending_invoices": pending_invoices,
+        "overdue_invoices": overdue_invoices,
+        "total_readings": total_readings,
+    }
 
 
 @app.get("/api/admin/customers")
@@ -368,27 +448,74 @@ def api_customers(request: Request, search: str = None):
         customers = crud.search_customers_by_name(search.strip())
     else:
         customers = crud.list_customers()
-    return customers
+    return serialize_mongo(customers)
 
 
 @app.post("/api/admin/customers")
-def api_create_customer(
-    name: str = Form(...),
-    phone: str = Form(None),
-    email: str = Form(None),
-    location: str = Form(None),
-    initial_reading: float = Form(None)
-):
+def api_create_customer(request: Request, customer_data: schemas.CustomerCreate):
     """Create a new customer"""
-    customer_data = {
-        "name": name,
-        "phone": phone,
-        "email": email,
-        "location": location,
-        "initial_reading": initial_reading
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    customer = crud.create_customer(customer_data.dict())
+    if not customer:
+        raise HTTPException(status_code=500, detail="Failed to create customer")
+    return {"message": "Customer created", "customer": serialize_mongo(customer)}
+
+
+@app.put("/api/admin/customers/{customer_id}")
+def api_update_customer(customer_id: int, request: Request, customer_data: CustomerUpdatePayload):
+    """Update an existing customer"""
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    update_data = {k: v for k, v in customer_data.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields provided for update")
+
+    customer = crud.update_customer(customer_id, update_data)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return {"message": "Customer updated", "customer": serialize_mongo(customer)}
+
+
+@app.delete("/api/admin/customers/{customer_id}")
+def api_delete_customer(customer_id: int, request: Request):
+    """Delete a customer"""
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    deleted = crud.delete_customer(customer_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return {"message": "Customer deleted", "customer_id": customer_id}
+
+
+@app.post("/api/admin/customers/bulk-delete")
+def api_bulk_delete_customers(request: Request, payload: BulkCustomerDeletePayload):
+    """Delete multiple customers and return per-item results"""
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    if not payload.customer_ids:
+        raise HTTPException(status_code=400, detail="customer_ids cannot be empty")
+
+    deleted_ids = []
+    not_found_ids = []
+    for customer_id in payload.customer_ids:
+        if crud.delete_customer(customer_id):
+            deleted_ids.append(customer_id)
+        else:
+            not_found_ids.append(customer_id)
+
+    return {
+        "message": "Bulk delete completed",
+        "requested_count": len(payload.customer_ids),
+        "deleted_count": len(deleted_ids),
+        "not_found_count": len(not_found_ids),
+        "deleted_ids": deleted_ids,
+        "not_found_ids": not_found_ids,
     }
-    customer = crud.create_customer(customer_data)
-    return {"message": "Customer created", "customer_id": customer.get("id")}
 
 
 @app.get("/api/admin/readings")
@@ -396,18 +523,18 @@ def api_readings(request: Request):
     """Get all meter readings"""
     if not check_admin_auth(request):
         raise HTTPException(status_code=401, detail="Admin access required")
-    return crud.get_all_readings()
+    return serialize_mongo(crud.get_all_readings())
 
 
 @app.post("/api/admin/customers/{customer_id}/readings")
-def api_add_reading(customer_id: int, reading_value: float = Form(...)):
+def api_add_reading(customer_id: int, request: Request, reading_data: schemas.MeterReadingCreate):
     """Add a meter reading for a customer"""
     if not check_admin_auth(request):
         raise HTTPException(status_code=401, detail="Admin access required")
     customer = crud.get_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    reading = crud.add_reading(customer_id, reading_value)
+    reading = crud.add_reading(customer_id, reading_data.reading_value)
     return {"message": "Reading added", "reading_id": reading.get("id")}
 
 
@@ -416,42 +543,126 @@ def api_invoices(request: Request):
     """Get list of invoices"""
     if not check_admin_auth(request):
         raise HTTPException(status_code=401, detail="Admin access required")
-    return crud.list_invoices()
+    return serialize_mongo(crud.list_invoices())
 
 
 @app.post("/api/admin/invoices/generate/{customer_id}")
-def api_generate_invoice(customer_id: int):
+def api_generate_invoice(customer_id: int, request: Request):
     """Generate an invoice for a customer"""
-    rate = crud.get_effective_rate()
-    calc = crud.calculate_amount_from_readings(customer_id, rate)
-    if not calc:
-        raise HTTPException(status_code=400, detail="Not enough readings to calculate invoice")
-    
-    amount, billing_from, billing_to = calc
-    due_date = datetime.utcnow() + timedelta(days=15)
-    customer = crud.get_customer(customer_id)
-    
-    inv = crud.create_invoice(customer_id, amount, due_date, customer.get("location") if customer else None)
-    
-    if customer:
-        notify.send_invoice_message(customer, inv, method="all")
-    
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    inv, error_message = generate_invoice_for_customer(customer_id)
+    if error_message:
+        raise HTTPException(status_code=400, detail=error_message)
+
     return {"message": "Invoice generated", "invoice_id": inv.get("id")}
 
 
+@app.post("/api/admin/invoices/bulk-generate")
+def api_bulk_generate_invoices(request: Request, payload: BulkInvoiceGeneratePayload):
+    """Generate invoices for multiple customers."""
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+    if not payload.customer_ids:
+        raise HTTPException(status_code=400, detail="customer_ids cannot be empty")
+
+    created_invoice_ids = []
+    failures = []
+    for customer_id in payload.customer_ids:
+        inv, error_message = generate_invoice_for_customer(customer_id)
+        if inv:
+            created_invoice_ids.append(inv.get("id"))
+        else:
+            failures.append({"customer_id": customer_id, "reason": error_message})
+
+    return {
+        "message": "Bulk invoice generation completed",
+        "requested_count": len(payload.customer_ids),
+        "created_count": len(created_invoice_ids),
+        "failed_count": len(failures),
+        "invoice_ids": created_invoice_ids,
+        "failures": failures,
+    }
+
+
 @app.post("/api/admin/invoices/{invoice_id}/pay")
-def api_pay_invoice(invoice_id: int):
+def api_pay_invoice(invoice_id: int, request: Request):
     """Mark an invoice as paid"""
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
     inv = crud.mark_invoice_paid(invoice_id)
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    return {"message": "Invoice marked as paid"}
+    return {"message": "Invoice marked as paid", "invoice": serialize_mongo(inv)}
+
+
+@app.post("/api/admin/invoices/{invoice_id}/send-reminder")
+def api_send_invoice_reminder(invoice_id: int, request: Request):
+    """Send reminder for a specific invoice."""
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    invoice = crud.get_invoice(invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    customer = crud.get_customer(invoice.get("customer_id"))
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    sent = notify.send_invoice_message(customer, invoice, method="all")
+    updated_invoice = crud.mark_reminder_sent(invoice_id, datetime.utcnow())
+
+    return {
+        "message": "Reminder processed",
+        "sent": bool(sent),
+        "invoice": serialize_mongo(updated_invoice or invoice),
+    }
+
+
+@app.post("/api/admin/reminders/bulk-send")
+def api_bulk_send_reminders(request: Request, payload: BulkReminderPayload):
+    """Send reminders for multiple invoices."""
+    if not check_admin_auth(request):
+        raise HTTPException(status_code=401, detail="Admin access required")
+    if not payload.invoice_ids:
+        raise HTTPException(status_code=400, detail="invoice_ids cannot be empty")
+
+    sent_ids = []
+    failed = []
+    for invoice_id in payload.invoice_ids:
+        invoice = crud.get_invoice(invoice_id)
+        if not invoice:
+            failed.append({"invoice_id": invoice_id, "reason": "Invoice not found"})
+            continue
+
+        customer = crud.get_customer(invoice.get("customer_id"))
+        if not customer:
+            failed.append({"invoice_id": invoice_id, "reason": "Customer not found"})
+            continue
+
+        sent = notify.send_invoice_message(customer, invoice, method="all")
+        crud.mark_reminder_sent(invoice_id, datetime.utcnow())
+        if sent:
+            sent_ids.append(invoice_id)
+        else:
+            failed.append({"invoice_id": invoice_id, "reason": "No provider delivery succeeded"})
+
+    return {
+        "message": "Bulk reminders processed",
+        "requested_count": len(payload.invoice_ids),
+        "sent_count": len(sent_ids),
+        "failed_count": len(failed),
+        "sent_ids": sent_ids,
+        "failed": failed,
+    }
 
 
 @app.get("/api/admin/rate")
 def api_get_rate(request: Request):
     """Get current rate configuration"""
-    if not request.session.get("is_admin"):
+    if not check_admin_auth(request):
         raise HTTPException(status_code=401, detail="Admin access required")
     rate = crud.get_rate_config()
     effective = crud.get_effective_rate()
@@ -461,7 +672,7 @@ def api_get_rate(request: Request):
 @app.post("/api/admin/rate")
 def api_set_rate(mode: str = Form(...), value: float = Form(...), request: Request = None):
     """Set rate configuration"""
-    if not request or not request.session.get("is_admin"):
+    if not request or not check_admin_auth(request):
         raise HTTPException(status_code=403, detail="Admin access required")
     if mode not in ("fixed", "percent"):
         raise HTTPException(status_code=400, detail="Invalid mode")

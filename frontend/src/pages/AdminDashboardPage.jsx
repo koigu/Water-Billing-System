@@ -21,7 +21,15 @@ export default function AdminDashboardPage() {
   if (loading) return <div>Loading dashboard...</div>
   if (error) return <div style={{ color: '#dc3545' }}>Error: {error}</div>
 
-  const { stats, rate, effective_rate, total_invoices, pending_invoices, overdue_invoices } = data || {}
+  const {
+    stats,
+    rate,
+    effective_rate,
+    total_invoices,
+    pending_invoices,
+    overdue_invoices,
+    total_readings,
+  } = data || {}
 
   return (
     <div>
@@ -46,16 +54,22 @@ export default function AdminDashboardPage() {
 
         <div className="card">
           <div className="card__title">Total Water Usage</div>
-          <div className="card__value">{stats?.total_water_usage || 0} m³</div>
+          <div className="card__value">{stats?.total_water_usage || 0} m3</div>
           <div className="card__meta">Calculated from invoices</div>
         </div>
 
         <div className="card">
           <div className="card__title">Current Rate</div>
-          <div className="card__value">{effective_rate?.toFixed(2)} KES/m³</div>
+          <div className="card__value">{Number(effective_rate || 0).toFixed(2)} KES/m3</div>
           <div className="card__meta">
-            Mode: {rate?.mode} | Value: {rate?.value}
+            Mode: {rate?.mode || '-'} | Value: {rate?.value ?? '-'}
           </div>
+        </div>
+
+        <div className="card">
+          <div className="card__title">Total Readings</div>
+          <div className="card__value">{total_readings || 0}</div>
+          <div className="card__meta">All recorded meter readings</div>
         </div>
 
         <div className="card">

@@ -1,57 +1,229 @@
-import { useEffect, useState } from 'react'
-import { fetchReadings } from '../api/adminApi'
+import { useEffect, useMemo, useState } from 'react'
+import { addReading, fetchCustomers, fetchReadings } from '../api/adminApi'
 
 export default function ReadingsPage() {
   const [readings, setReadings] = useState([])
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [form, setForm] = useState({ customer_id: '', reading_value: '' })
+  const [filters, setFilters] = useState({
+    customer_id: '',
+    date_from: '',
+    date_to: '',
+  })
+
+  const customerMap = useMemo(() => {
+    const map = {}
+    for (const c of customers) {
+      const id = c.id || c.account_number
+      map[id] = c.name || `Customer ${id}`
+    }
+    return map
+  }, [customers])
+
+  const filteredReadings = useMemo(() => {
+    return readings.filter((r) => {
+      const matchesCustomer =
+        !filters.customer_id || String(r.customer_id) === String(filters.customer_id)
+      if (!matchesCustomer) return false
+
+      const recorded = new Date(r.recorded_at)
+
+      if (filters.date_from) {
+        const from = new Date(`${filters.date_from}T00:00:00`)
+        if (recorded < from) return false
+      }
+      if (filters.date_to) {
+        const to = new Date(`${filters.date_to}T23:59:59`)
+        if (recorded > to) return false
+      }
+
+      return true
+    })
+  }, [readings, filters])
+
+  const loadData = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [readingsRes, customersRes] = await Promise.all([fetchReadings(), fetchCustomers()])
+      setReadings(readingsRes)
+      setCustomers(customersRes)
+      if (!form.customer_id && customersRes.length > 0) {
+        const firstId = customersRes[0].id || customersRes[0].account_number
+        setForm((prev) => ({ ...prev, customer_id: String(firstId) }))
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    fetchReadings()
-      .then((res) => {
-        setReadings(res)
-        setLoading(false)
-      })
-      .catch((err) => {
-        setError(err.message)
-        setLoading(false)
-      })
+    loadData()
   }, [])
+
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target
+    setFilters((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const clearFilters = () => {
+    setFilters({ customer_id: '', date_from: '', date_to: '' })
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    setMessage('')
+    try {
+      const customerId = Number(form.customer_id)
+      const readingValue = Number(form.reading_value)
+      await addReading(customerId, readingValue)
+      setMessage('Reading recorded successfully.')
+      setForm((prev) => ({ ...prev, reading_value: '' }))
+      const readingsRes = await fetchReadings()
+      setReadings(readingsRes)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   return (
     <div>
       <div className="page-header">
         <div>
           <h2 className="page-title">Meter Readings</h2>
-          <p className="page-description">Latest readings per customer</p>
+          <p className="page-description">Record and review meter readings</p>
         </div>
       </div>
 
-      {loading && <div>Loading readings...</div>}
-      {error && <div style={{ color: '#dc3545' }}>Error: {error}</div>}
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'grid', gap: '0.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}
+      >
+        <select className="input" name="customer_id" value={form.customer_id} onChange={handleChange} required>
+          <option value="">Select customer</option>
+          {customers.map((c) => {
+            const id = c.id || c.account_number
+            return (
+              <option key={id} value={id}>
+                #{id} - {c.name}
+              </option>
+            )
+          })}
+        </select>
+        <input
+          className="input"
+          name="reading_value"
+          type="number"
+          step="0.01"
+          min="0"
+          value={form.reading_value}
+          onChange={handleChange}
+          placeholder="Reading value"
+          required
+        />
+        <button className="button" type="submit" disabled={submitting}>
+          {submitting ? 'Saving...' : 'Record Reading'}
+        </button>
+      </form>
 
-      {!loading && readings.length > 0 && (
-        <div className="table-wrapper">
+      <div
+        style={{
+          marginTop: '1rem',
+          display: 'grid',
+          gap: '0.5rem',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        }}
+      >
+        <select
+          className="input"
+          name="customer_id"
+          value={filters.customer_id}
+          onChange={handleFilterChange}
+        >
+          <option value="">All customers</option>
+          {customers.map((c) => {
+            const id = c.id || c.account_number
+            return (
+              <option key={id} value={id}>
+                #{id} - {c.name}
+              </option>
+            )
+          })}
+        </select>
+        <input
+          className="input"
+          name="date_from"
+          type="date"
+          value={filters.date_from}
+          onChange={handleFilterChange}
+        />
+        <input
+          className="input"
+          name="date_to"
+          type="date"
+          value={filters.date_to}
+          onChange={handleFilterChange}
+        />
+        <button className="button button--ghost" type="button" onClick={clearFilters}>
+          Clear Filters
+        </button>
+      </div>
+
+      {loading && <div>Loading readings...</div>}
+      {error && <div style={{ color: '#dc3545', marginTop: '0.5rem' }}>Error: {error}</div>}
+      {message && <div style={{ color: '#0f5132', marginTop: '0.5rem' }}>{message}</div>}
+
+      {!loading && (
+        <div style={{ marginTop: '0.75rem', color: '#666' }}>
+          Showing {filteredReadings.length} of {readings.length} readings
+        </div>
+      )}
+
+      {!loading && filteredReadings.length > 0 && (
+        <div className="table-wrapper" style={{ marginTop: '1rem' }}>
           <table>
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Customer ID</th>
-                <th>Reading (m³)</th>
+                <th>Customer</th>
+                <th>Reading (m3)</th>
                 <th>Recorded At</th>
               </tr>
             </thead>
             <tbody>
-              {readings.map((r) => (
+              {filteredReadings.map((r) => (
                 <tr key={r.id}>
                   <td>{r.id}</td>
-                  <td>{r.customer_id}</td>
+                  <td>
+                    #{r.customer_id} - {customerMap[r.customer_id] || 'Unknown'}
+                  </td>
                   <td>{r.reading_value}</td>
                   <td>{new Date(r.recorded_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && filteredReadings.length === 0 && !error && (
+        <div style={{ marginTop: '1rem', textAlign: 'center', color: '#666' }}>
+          No readings match the selected filters.
         </div>
       )}
     </div>

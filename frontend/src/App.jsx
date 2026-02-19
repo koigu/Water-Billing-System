@@ -58,11 +58,10 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    // Check if user is already logged in
+    // Require both auth flag and token to avoid stale localStorage state
     const adminStatus = localStorage.getItem('is_admin')
-    if (adminStatus === 'true') {
-      setIsAuthenticated(true)
-    }
+    const token = localStorage.getItem('token')
+    setIsAuthenticated(adminStatus === 'true' && !!token)
   }, [])
 
   const handleLogin = () => {
