@@ -23,11 +23,9 @@ export default function LoginPage({ onLogin }) {
       }
 
       if (response.message === 'Login successful') {
-        // Store auth state and token in localStorage
         localStorage.setItem('is_admin', 'true')
         localStorage.setItem('username', response.username || username)
         localStorage.setItem('token', token)
-        // Call onLogin to update parent state and trigger navigation
         if (onLogin) {
           onLogin()
         }
@@ -42,55 +40,48 @@ export default function LoginPage({ onLogin }) {
 
   return (
     <div className="login-page">
-      <div className="login-container">
-        <div className="login__brand">
-          <span className="brand__logo">💧</span>
-          <span className="brand__title">Water Billing</span>
+      <div className="login-page__bg" />
+      <div className="login-container card">
+        <div className="login__header">
+          <span className="login__badge">Utility Ops</span>
+          <h1 className="login__title">Water Billing Control Center</h1>
+          <p className="login__subtitle">Sign in to manage cycles, readings, invoices, and reminders.</p>
         </div>
-        
-        <h2 className="login__title">Admin Login</h2>
-        
+
         {error && <div className="login__error">{error}</div>}
-        
+
         <form onSubmit={handleLogin} className="login__form">
-          <div className="form-group">
-            <label className="form-label">Username</label>
+          <div className="login__field">
+            <label className="login__label">Username</label>
             <input
               type="text"
-              className="form-input"
+              className="input login__input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter username"
               required
             />
           </div>
-          
-          <div className="form-group">
-            <label className="form-label">Password</label>
+
+          <div className="login__field">
+            <label className="login__label">Password</label>
             <input
               type="password"
-              className="form-input"
+              className="input login__input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
               required
             />
           </div>
-          
-          <button 
-            type="submit" 
-            className="btn btn--primary login__btn"
-            disabled={loading}
-          >
+
+          <button type="submit" className="button login__btn" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-        
-        <div className="login__hint">
-          Default credentials: admin / changeme
-        </div>
+
+        <div className="login__hint">Use your assigned admin credentials.</div>
       </div>
     </div>
   )
 }
-

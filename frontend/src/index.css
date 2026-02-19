@@ -229,6 +229,27 @@ body {
   background: rgba(11, 94, 215, 0.08);
 }
 
+.button--danger {
+  background-color: #c62828;
+  color: #fff;
+}
+
+.button--danger:hover {
+  background-color: #a61f1f;
+  box-shadow: 0 12px 24px rgba(198, 40, 40, 0.28);
+}
+
+.button--logout {
+  background: linear-gradient(135deg, #0b5ed7, #063d8f);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 10px 20px rgba(11, 94, 215, 0.25);
+  min-width: 110px;
+}
+
+.button--logout:hover {
+  background: linear-gradient(135deg, #0a53be, #052f6d);
+}
+
 .button--small {
   padding: 0.3rem 0.65rem;
   font-size: 0.8rem;
@@ -284,6 +305,165 @@ tr:last-child td {
   border-bottom: none;
 }
 
+.cycle-ops {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 0.9rem;
+  background: linear-gradient(145deg, #ffffff, #f4f9ff);
+  border: 1px solid #dbe8ff;
+  box-shadow: 0 12px 24px rgba(10, 55, 125, 0.08);
+}
+
+.cycle-ops__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.cycle-ops__title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.cycle-ops__subtitle {
+  margin: 0.15rem 0 0;
+  color: #56719a;
+  font-size: 0.86rem;
+}
+
+.cycle-ops__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.cycle-ops__item {
+  background: #fff;
+  border: 1px solid #e6eefb;
+  border-radius: 0.65rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.cycle-ops__label {
+  display: block;
+  color: #607a9f;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cycle-ops__value {
+  font-size: 1.3rem;
+}
+
+.cycle-ops__actions {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.cycle-ops__message {
+  margin-top: 0.7rem;
+  color: #0f5132;
+  font-size: 0.9rem;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  position: relative;
+  padding: 1.2rem;
+  overflow: hidden;
+}
+
+.login-page__bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(13, 110, 253, 0.2), transparent 36%),
+    radial-gradient(circle at 82% 15%, rgba(25, 135, 84, 0.18), transparent 34%),
+    radial-gradient(circle at 70% 85%, rgba(13, 110, 253, 0.14), transparent 40%),
+    linear-gradient(160deg, #f4f9ff 0%, #edf3ff 40%, #e7f0ff 100%);
+  z-index: 0;
+}
+
+.login-container {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 450px);
+  padding: 1.2rem 1.25rem;
+}
+
+.login__header {
+  margin-bottom: 0.8rem;
+}
+
+.login__badge {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid #b7d4ff;
+  padding: 0.12rem 0.6rem;
+  font-size: 0.72rem;
+  color: #0c4eb5;
+  background: #eef5ff;
+}
+
+.login__title {
+  margin: 0.45rem 0 0;
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.login__subtitle {
+  margin: 0.45rem 0 0;
+  color: #5b6b8b;
+  font-size: 0.9rem;
+}
+
+.login__form {
+  margin-top: 0.85rem;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.login__field {
+  display: grid;
+  gap: 0.34rem;
+}
+
+.login__label {
+  font-size: 0.83rem;
+  color: #4d6288;
+}
+
+.login__input {
+  height: 40px;
+}
+
+.login__btn {
+  margin-top: 0.3rem;
+  width: 100%;
+}
+
+.login__error {
+  margin-top: 0.6rem;
+  border: 1px solid #f4c7cc;
+  background: #fff0f2;
+  color: #8f1d2c;
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.86rem;
+}
+
+.login__hint {
+  margin-top: 0.8rem;
+  color: #6b7a96;
+  font-size: 0.82rem;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -308,5 +488,11 @@ tr:last-child td {
 
   .main {
     padding: 1rem;
+  }
+
+  .cycle-ops__head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.55rem;
   }
 }

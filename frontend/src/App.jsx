@@ -44,8 +44,8 @@ function AppLayout({ children, onLogout }) {
             <h1 className="main__title">Water Billing System</h1>
             <p className="main__subtitle">Modern management of customers, usage and invoices</p>
           </div>
-          <button onClick={onLogout} className="btn btn--secondary">
-            Logout
+          <button onClick={onLogout} className="button button--logout">
+            Sign Out
           </button>
         </header>
         <main className="main__content">{children}</main>
