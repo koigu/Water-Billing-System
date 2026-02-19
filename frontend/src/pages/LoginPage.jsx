@@ -75,8 +75,8 @@ export default function LoginPage({ onLogin }) {
         </section>
 
         <section className="login-panel card">
-          <div className="login-panel__logo">WB</div>
-          <h2 className="login-panel__title">Welcome back</h2>
+          <div className="login-panel__logo">WB💧</div>
+          <h2 className="login-panel__title">Welcome to Water Billing</h2>
           <p className="login-panel__subtitle">Sign in to access your water billing workspace.</p>
 
           {error && <div className="login__error">{error}</div>}
