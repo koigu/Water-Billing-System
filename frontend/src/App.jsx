@@ -42,7 +42,7 @@ function AppLayout({ children, onLogout }) {
         <header className="main__topbar">
           <div>
             <h1 className="main__title">Water Billing System</h1>
-            <p className="main__subtitle">Modern management of customers, usage and invoices</p>
+            <p className="main__subtitle">Management of customers, usage and invoices</p>
           </div>
           <button onClick={onLogout} className="button button--logout">
             Sign Out
@@ -80,9 +80,15 @@ function App() {
     setIsAuthenticated(false)
   }
 
-  // Show login page if not authenticated
+  // Allow customer portal access even when admin is not authenticated
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />
+    return (
+      <Routes>
+        <Route path="/portal" element={<CustomerPortalPage />} />
+        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+        <Route path="*" element={<LoginPage onLogin={handleLogin} />} />
+      </Routes>
+    )
   }
 
   return (

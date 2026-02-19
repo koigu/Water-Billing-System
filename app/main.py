@@ -756,14 +756,14 @@ def get_customer_portal_data(request: Request):
     # Calculate total due
     total_due = sum(inv.get("amount", 0) for inv in recent_invoices if inv.get("status") in ["pending", "overdue"])
     
-    return {
+    return serialize_mongo({
         "customer": customer,
         "recent_invoices": recent_invoices,
         "usage_history": usage_history,
         "benchmark": benchmark,
         "alerts": alerts,
         "total_due": total_due
-    }
+    })
 
 
 # ==================== ANALYTICS API ROUTES (MongoDB) ====================

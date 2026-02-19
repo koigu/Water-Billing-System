@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { apiPost } from '../api/httpClient'
 
 export default function LoginPage({ onLogin }) {
@@ -81,6 +81,9 @@ export default function LoginPage({ onLogin }) {
         </form>
 
         <div className="login__hint">Use your assigned admin credentials.</div>
+        <Link to="/portal" className="button button--ghost login__portal-link">
+          Customer Portal Sign In
+        </Link>
       </div>
     </div>
   )

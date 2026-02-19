@@ -1,48 +1,58 @@
-import { apiGet, apiPost } from './httpClient'
+const API_BASE_URL = 'http://127.0.0.1:8000'
 
-export function customerLogin(username, password) {
-  return apiPost('/api/auth/login', { username, password })
+async function parseResponse(res, method, path) {
+  if (!res.ok) {
+    let detail = ''
+    try {
+      const data = await res.json()
+      detail = data?.detail || data?.message || ''
+    } catch {
+      // ignore parse errors
+    }
+    throw new Error(
+      detail
+        ? `${method} ${path} failed: ${res.status} - ${detail}`
+        : `${method} ${path} failed: ${res.status}`
+    )
+  }
+  return res.json()
+}
+
+export async function customerLogin(username, password) {
+  const path = '/api/auth/login'
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password }),
+  })
+  return parseResponse(res, 'POST', path)
 }
 
 export function customerRegister(customerId, username, password) {
+  const path = '/api/auth/register'
   const formData = new FormData()
   formData.append('customer_id', customerId)
   formData.append('username', username)
   formData.append('password', password)
 
-  return fetch('http://127.0.0.1:8000/api/auth/register', {
+  return fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     credentials: 'include',
     body: formData,
-  }).then((res) => {
-    if (!res.ok) {
-      throw new Error(`Register failed: ${res.status}`)
-    }
-    return res.json()
-  })
+  }).then((res) => parseResponse(res, 'POST', path))
 }
 
-export function fetchPortalData(token) {
-  return apiGet('/api/customer/portal', {
+export async function fetchPortalData(token) {
+  const path = '/api/customer/portal'
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    credentials: 'include',
     headers: {
       Authorization: `Bearer ${token}`,
     },
   })
-}
-
-export function createPayment(token, payment) {
-  return apiPost('/api/customer/payments', payment, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
-}
-
-export function markAlertRead(token, alertId) {
-  return apiPost(`/api/customer/alerts/${alertId}/read`, null, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  })
+  return parseResponse(res, 'GET', path)
 }

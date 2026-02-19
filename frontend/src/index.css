@@ -464,6 +464,17 @@ tr:last-child td {
   font-size: 0.82rem;
 }
 
+.login__portal-link {
+  margin-top: 0.6rem;
+  width: 100%;
+}
+
+.customer-portal__login {
+  max-width: 360px;
+  display: grid;
+  gap: 0.65rem;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
