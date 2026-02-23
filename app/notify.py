@@ -59,6 +59,37 @@ def _manager_available() -> bool:
     return False
 
 
+def _format_phone_number(phone: str) -> str:
+    """
+    Format phone number to international format for Africa's Talking.
+    
+    Args:
+        phone: Phone number in various formats (e.g., "0712345678", "254712345678", "+254712345678")
+    
+    Returns:
+        Phone number in international format with country code (e.g., "+254712345678")
+    """
+    if not phone:
+        return ""
+    
+    # Remove any whitespace and special characters
+    phone = phone.strip()
+    
+    # Remove + if present
+    if phone.startswith("+"):
+        phone = phone[1:]
+    
+    # Remove leading zeros for Kenya (254)
+    if phone.startswith("0"):
+        phone = "254" + phone[1:]
+    
+    # If it doesn't start with 254, assume it's a Kenyan number without country code
+    if not phone.startswith("254"):
+        phone = "254" + phone
+    
+    return "+" + phone
+
+
 # ==================== Backward Compatibility Functions ====================
 
 def send_sms(to_number: str, body: str) -> bool:
@@ -75,7 +106,11 @@ def send_sms(to_number: str, body: str) -> bool:
     if not _manager_available():
         return False
 
-    result = notification_manager.send_sms(to_number, body)
+    # Format phone number to international format
+    formatted_phone = _format_phone_number(to_number)
+    logger.info(f"Sending SMS to {formatted_phone}")
+    
+    result = notification_manager.send_sms(formatted_phone, body)
     return result.get("success", False)
 
 
