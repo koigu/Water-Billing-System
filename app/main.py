@@ -35,7 +35,7 @@ app = FastAPI(title="Water Billing System")
 # CORS middleware for frontend-backend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5174", "http://127.0.0.1:5174"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -119,8 +119,15 @@ def generate_invoice_for_customer(customer_id: int):
         return None, "Customer not found"
 
     inv = crud.create_invoice(customer_id, amount, due_date, customer.get("location"))
-    if customer:
-        notify.send_invoice_message(customer, inv, method="all")
+    
+    # Send invoice notification (wrapped in try-except to prevent 500 errors)
+    try:
+        if customer:
+            notify.send_invoice_message(customer, inv, method="all")
+    except Exception as e:
+        logger.error(f"Failed to send invoice notification: {e}")
+        # Don't fail the invoice generation if notification fails
+    
     return inv, None
 
 
@@ -270,9 +277,13 @@ def generate_invoice(customer_id: int):
     
     inv = crud.create_invoice(customer_id, amount, due_date, customer.get("location") if customer else None)
     
-    # Send invoice notification
-    if customer:
-        notify.send_invoice_message(customer, inv, method="all")
+    # Send invoice notification (wrapped in try-except to prevent 500 errors)
+    try:
+        if customer:
+            notify.send_invoice_message(customer, inv, method="all")
+    except Exception as e:
+        logger.error(f"Failed to send invoice notification: {e}")
+        # Don't fail the invoice generation if notification fails
     
     # Update invoice with sent time
     db = mongodb.get_db()
@@ -611,7 +622,13 @@ def api_send_invoice_reminder(invoice_id: int, request: Request):
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    sent = notify.send_invoice_message(customer, invoice, method="all")
+    # Send notification wrapped in try-except to prevent 500 errors
+    try:
+        sent = notify.send_invoice_message(customer, invoice, method="all")
+    except Exception as e:
+        logger.error(f"Failed to send invoice reminder: {e}")
+        sent = False
+    
     updated_invoice = crud.mark_reminder_sent(invoice_id, datetime.utcnow())
 
     return {
