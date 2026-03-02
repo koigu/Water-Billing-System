@@ -24,12 +24,21 @@ export default function LoginPage({ onLogin }) {
 
       if (response.message === 'Login successful') {
         localStorage.setItem('is_admin', 'true')
+        localStorage.setItem('is_super_admin', response.is_super_admin ? 'true' : 'false')
         localStorage.setItem('username', response.username || username)
         localStorage.setItem('token', token)
-        if (onLogin) {
-          onLogin()
+        if (response.provider_slug) {
+          localStorage.setItem('provider_slug', response.provider_slug)
+        } else {
+          localStorage.removeItem('provider_slug')
         }
-        navigate('/admin/dashboard')
+        if (onLogin) {
+          onLogin({
+            is_super_admin: !!response.is_super_admin,
+            provider_slug: response.provider_slug || null,
+          })
+        }
+        navigate(response.is_super_admin ? '/super-admin/dashboard' : '/admin/dashboard')
       }
     } catch (err) {
       setError(err.message || 'Invalid credentials')
@@ -43,41 +52,41 @@ export default function LoginPage({ onLogin }) {
       <div className="login-page__bg" />
       <div className="login-layout">
         <section className="login-showcase">
-          <span className="login-showcase__badge">Secure Utility Operations Workspace</span>
+          <span className="login-showcase__badge">Celebration Waters Operations Workspace</span>
           <h1 className="login-showcase__title">
-            Keep every <span>meter reading</span>, every <span>invoice</span>, and every account
+            Keep every <span>meter reading</span>, every <span>invoice</span>, and every customer
             <br />
             fully accountable.
           </h1>
           <p className="login-showcase__desc">
-            Built for water service teams: monitor usage, generate billing cycles, and track overdue
-            accounts from one secure control center.
+            A practical platform for utility teams and new staff: record usage, run billing cycles,
+            and follow up overdue accounts from one control center.
           </p>
 
           <div className="login-showcase__grid">
             <div className="login-showcase__item">
               <h3>Meter reading discipline</h3>
-              <p>Track collection coverage by cycle and quickly identify missing readings.</p>
+              <p>Track collection coverage by cycle and quickly identify missed households.</p>
             </div>
             <div className="login-showcase__item">
               <h3>Billing clarity</h3>
-              <p>Generate invoices in batches with transparent usage-to-amount calculations.</p>
+              <p>Generate invoices with transparent usage-to-amount calculations.</p>
             </div>
             <div className="login-showcase__item">
               <h3>Reminder workflows</h3>
-              <p>Follow up overdue accounts with bulk reminders and operational visibility.</p>
+              <p>Follow up overdue balances with reminders and clear status visibility.</p>
             </div>
             <div className="login-showcase__item">
-              <h3>Role-based access</h3>
-              <p>Separate admin operations from customer portal sign-in in a secure workflow.</p>
+              <h3>Fast onboarding</h3>
+              <p>New users can understand daily operations quickly through cycle actions.</p>
             </div>
           </div>
         </section>
 
         <section className="login-panel card">
-          <div className="login-panel__logo">WB💧</div>
-          <h2 className="login-panel__title">Welcome to Water Billing</h2>
-          <p className="login-panel__subtitle">Sign in to access your water billing workspace.</p>
+          <div className="login-panel__logo">CW</div>
+          <h2 className="login-panel__title">Welcome to Celebration Waters</h2>
+          <p className="login-panel__subtitle">Sign in to access the billing and operations dashboard.</p>
 
           {error && <div className="login__error">{error}</div>}
 
@@ -113,9 +122,9 @@ export default function LoginPage({ onLogin }) {
 
           <div className="login-panel__divider">OR</div>
           <Link to="/portal" className="button button--ghost login__portal-link">
-            Explore Customer Portal
+            Open Customer Portal
           </Link>
-          <div className="login__hint">Use your assigned admin credentials.</div>
+          <div className="login__hint">Use credentials assigned by your system administrator.</div>
         </section>
       </div>
     </div>

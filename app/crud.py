@@ -119,21 +119,44 @@ def delete_customer(customer_id: int) -> bool:
 
 # ==================== METER READING CRUD ====================
 
-def add_reading(customer_id: int, reading_value: float) -> dict:
-    """Add a meter reading for a customer."""
+def add_reading(customer_id: int, reading_value: Optional[float] = None) -> dict:
+    """Add or update a monthly meter reading for a customer."""
     db = get_db()
     if db is None:
         return None
-    
+
+    now = datetime.utcnow()
+    reading_month = now.strftime("%Y-%m")
+    status = "missing" if reading_value is None else "recorded"
+
+    existing = db["meter_readings"].find_one({
+        "customer_id": customer_id,
+        "reading_month": reading_month,
+    })
+
+    if existing:
+        updated = db["meter_readings"].find_one_and_update(
+            {"_id": existing["_id"]},
+            {"$set": {
+                "reading_value": reading_value,
+                "status": status,
+                "recorded_at": now,
+                "reading_month": reading_month,
+            }},
+            return_document=True
+        )
+        return updated
+
     reading_id = get_next_id(db, "meter_readings")
-    
     reading = {
         "id": reading_id,
         "customer_id": customer_id,
         "reading_value": reading_value,
-        "recorded_at": datetime.utcnow()
+        "status": status,
+        "reading_month": reading_month,
+        "recorded_at": now
     }
-    
+
     result = db["meter_readings"].insert_one(reading)
     reading["_id"] = result.inserted_id
     return reading
@@ -155,7 +178,7 @@ def get_latest_two_readings(customer_id: int) -> List[dict]:
     if db is None:
         return []
     return list(db["meter_readings"].find(
-        {"customer_id": customer_id}
+        {"customer_id": customer_id, "status": {"$ne": "missing"}, "reading_value": {"$type": "number"}}
     ).sort("recorded_at", -1).limit(2))
 
 
@@ -569,7 +592,12 @@ def get_customer_usage_history(customer_id: int, months: int = 12) -> List[dict]
     start_date = datetime.utcnow() - timedelta(days=months * 30)
     
     pipeline = [
-        {"$match": {"customer_id": customer_id, "recorded_at": {"$gte": start_date}}},
+        {"$match": {
+            "customer_id": customer_id,
+            "recorded_at": {"$gte": start_date},
+            "status": {"$ne": "missing"},
+            "reading_value": {"$type": "number"}
+        }},
         {"$sort": {"recorded_at": 1}},
         {"$group": {
             "_id": {"$dateToString": {"format": "%Y-%m", "date": "$recorded_at"}},
@@ -609,7 +637,12 @@ def get_customer_benchmark(customer_id: int) -> Optional[dict]:
     
     # Get customer's average usage
     customer_usage = db["meter_readings"].aggregate([
-        {"$match": {"customer_id": customer_id, "recorded_at": {"$gte": ninety_days_ago}}},
+        {"$match": {
+            "customer_id": customer_id,
+            "recorded_at": {"$gte": ninety_days_ago},
+            "status": {"$ne": "missing"},
+            "reading_value": {"$type": "number"}
+        }},
         {"$group": {"_id": None, "avg": {"$avg": "$reading_value"}}}
     ])
     customer_usage = list(customer_usage)
@@ -631,7 +664,9 @@ def get_customer_benchmark(customer_id: int) -> Optional[dict]:
             {"$unwind": "$customer"},
             {"$match": {
                 "customer.location": customer["location"],
-                "recorded_at": {"$gte": ninety_days_ago}
+                "recorded_at": {"$gte": ninety_days_ago},
+                "status": {"$ne": "missing"},
+                "reading_value": {"$type": "number"}
             }},
             {"$group": {"_id": None, "avg": {"$avg": "$reading_value"}}}
         ])
@@ -641,7 +676,11 @@ def get_customer_benchmark(customer_id: int) -> Optional[dict]:
     
     # Calculate percentile
     all_usages = db["meter_readings"].aggregate([
-        {"$match": {"recorded_at": {"$gte": ninety_days_ago}}},
+        {"$match": {
+            "recorded_at": {"$gte": ninety_days_ago},
+            "status": {"$ne": "missing"},
+            "reading_value": {"$type": "number"}
+        }},
         {"$group": {"_id": "$customer_id", "avg": {"$avg": "$reading_value"}, "count": {"$sum": 1}}},
         {"$match": {"count": {"$gte": 3}}}
     ])

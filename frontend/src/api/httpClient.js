@@ -8,15 +8,18 @@ function getToken() {
 
 function clearAuthState() {
   localStorage.removeItem('is_admin')
+  localStorage.removeItem('is_super_admin')
   localStorage.removeItem('username')
   localStorage.removeItem('token')
+  localStorage.removeItem('provider_slug')
 }
 
 function buildHeaders(options = {}) {
   const token = getToken()
+  const providerSlug = localStorage.getItem('provider_slug') || PROVIDER_SLUG
   const headers = {
     'Content-Type': 'application/json',
-    'X-Provider-Slug': PROVIDER_SLUG,
+    'X-Provider-Slug': providerSlug,
     ...(options.headers || {}),
   }
 

@@ -4,7 +4,7 @@ Complete rewrite using MongoDB instead of SQLite/SQLAlchemy.
 """
 import os
 from fastapi import FastAPI, HTTPException, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,8 +22,9 @@ import os
 from typing import List, Optional
 from pydantic import BaseModel
 from bson import ObjectId
+from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
 
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=False)
 
 logger = logging.getLogger("uvicorn")
 logging.basicConfig(level=logging.INFO)
@@ -40,6 +41,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(PyMongoError)
+async def handle_pymongo_errors(_: Request, exc: PyMongoError):
+    """Return controlled API error when MongoDB is unavailable."""
+    if isinstance(exc, ServerSelectionTimeoutError):
+        logger.error(f"MongoDB server selection failed: {exc}")
+    else:
+        logger.error(f"MongoDB error: {exc}")
+
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Database temporarily unavailable. Please check MongoDB connectivity and try again."
+        },
+    )
 
 # Session middleware for user authentication
 # Configure session to work with cross-origin requests
@@ -90,6 +106,23 @@ class BulkReminderPayload(BaseModel):
     invoice_ids: List[int]
 
 
+class ProviderCreatePayload(BaseModel):
+    name: str
+    slug: str
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+    rate_per_unit: float = 1.5
+
+
+class ProviderUpdatePayload(BaseModel):
+    name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
 def serialize_mongo(data):
     """Convert MongoDB ObjectId values to JSON-safe strings and drop internal _id keys."""
     if isinstance(data, list):
@@ -119,16 +152,81 @@ def generate_invoice_for_customer(customer_id: int):
         return None, "Customer not found"
 
     inv = crud.create_invoice(customer_id, amount, due_date, customer.get("location"))
-    
+
+    sent = False
     # Send invoice notification (wrapped in try-except to prevent 500 errors)
     try:
         if customer:
-            notify.send_invoice_message(customer, inv, method="all")
+            sent = bool(notify.send_invoice_message(customer, inv, method="all"))
     except Exception as e:
         logger.error(f"Failed to send invoice notification: {e}")
-        # Don't fail the invoice generation if notification fails
-    
+        sent = False
+
+    # Persist delivery status for auditability in invoice records.
+    db = mongodb.get_db()
+    if db:
+        update_fields = {"notification_status": "sent" if sent else "failed"}
+        if sent:
+            update_fields["sent_at"] = datetime.utcnow()
+        db["invoices"].update_one({"id": inv.get("id")}, {"$set": update_fields})
+        inv.update(update_fields)
+
     return inv, None
+
+
+def maybe_generate_monthly_invoice(customer_id: int, reading: Optional[dict] = None):
+    """
+    Generate at most one invoice per customer per month after a recorded reading.
+    Returns a status dictionary describing what happened.
+    """
+    if not reading:
+        return {"generated": False, "reason": "no_reading"}
+    if reading.get("status") != "recorded":
+        return {"generated": False, "reason": "missing_reading"}
+
+    month_key = reading.get("reading_month") or datetime.utcnow().strftime("%Y-%m")
+    month_start = datetime.strptime(f"{month_key}-01", "%Y-%m-%d")
+    if month_start.month == 12:
+        month_end = datetime(month_start.year + 1, 1, 1)
+    else:
+        month_end = datetime(month_start.year, month_start.month + 1, 1)
+
+    db = mongodb.get_db()
+    if db:
+        existing_invoice = db["invoices"].find_one({
+            "customer_id": customer_id,
+            "created_at": {"$gte": month_start, "$lt": month_end},
+        })
+        if existing_invoice:
+            return {
+                "generated": False,
+                "reason": "invoice_exists_for_month",
+                "invoice_id": existing_invoice.get("id"),
+            }
+
+    inv, error_message = generate_invoice_for_customer(customer_id)
+    if inv:
+        return {
+            "generated": True,
+            "invoice_id": inv.get("id"),
+            "notification_status": inv.get("notification_status", "unknown"),
+        }
+    return {"generated": False, "reason": error_message or "invoice_not_generated"}
+
+
+def require_super_admin(request: Request) -> None:
+    """Require super admin role from session."""
+    if request.session.get("is_admin") and request.session.get("is_super_admin"):
+        return
+
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        # Super admin tokens are prefixed with "sa_"
+        if token.startswith("sa_") and len(token) > 12:
+            return
+
+    raise HTTPException(status_code=401, detail="Super admin access required")
 
 
 # Mount static files
@@ -256,43 +354,20 @@ def create_customer(
 
 
 @app.post("/customers/{customer_id}/readings")
-def add_reading(customer_id: int, reading_value: float = Form(...)):
+def add_reading(customer_id: int, reading_value: Optional[float] = Form(None)):
     customer = crud.get_customer(customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
-    crud.add_reading(customer_id, reading_value)
+    reading = crud.add_reading(customer_id, reading_value)
+    maybe_generate_monthly_invoice(customer_id, reading)
     return RedirectResponse(url="/", status_code=303)
 
 
 @app.post("/invoices/generate/{customer_id}")
 def generate_invoice(customer_id: int):
-    rate = crud.get_effective_rate()
-    calc = crud.calculate_amount_from_readings(customer_id, rate)
-    if not calc:
-        raise HTTPException(status_code=400, detail="Not enough readings to calculate invoice")
-    
-    amount, billing_from, billing_to = calc
-    due_date = datetime.utcnow() + timedelta(days=15)
-    customer = crud.get_customer(customer_id)
-    
-    inv = crud.create_invoice(customer_id, amount, due_date, customer.get("location") if customer else None)
-    
-    # Send invoice notification (wrapped in try-except to prevent 500 errors)
-    try:
-        if customer:
-            notify.send_invoice_message(customer, inv, method="all")
-    except Exception as e:
-        logger.error(f"Failed to send invoice notification: {e}")
-        # Don't fail the invoice generation if notification fails
-    
-    # Update invoice with sent time
-    db = mongodb.get_db()
-    if db:
-        db["invoices"].update_one(
-            {"id": inv.get("id")},
-            {"$set": {"sent_at": datetime.utcnow()}}
-        )
-    
+    inv, error_message = generate_invoice_for_customer(customer_id)
+    if error_message:
+        raise HTTPException(status_code=400, detail=error_message)
     return RedirectResponse(url="/", status_code=303)
 
 
@@ -352,13 +427,19 @@ def api_login(request: Request, credentials: schemas.LoginCredentials):
     
     if admin:
         # Generate a simple token
-        token = secrets.token_urlsafe(32)
+        token = f"sa_{secrets.token_urlsafe(32)}"
         request.session['is_admin'] = True
         request.session['is_super_admin'] = True
         request.session['username'] = admin['username']
         request.session['admin_id'] = admin['id']
         request.session['token'] = token
-        return {"message": "Login successful", "username": admin['username'], "token": token}
+        return {
+            "message": "Login successful",
+            "username": admin['username'],
+            "token": token,
+            "is_super_admin": True,
+            "provider_slug": None,
+        }
     
     # If not super admin, try provider admin authentication
     # Get all providers and check each one
@@ -374,14 +455,20 @@ def api_login(request: Request, credentials: schemas.LoginCredentials):
             )
             if admin:
                 # Generate a simple token
-                token = secrets.token_urlsafe(32)
+                token = f"pa_{secrets.token_urlsafe(32)}"
                 request.session['is_admin'] = True
                 request.session['is_super_admin'] = admin.get('is_super_admin', False)
                 request.session['username'] = admin['username']
                 request.session['admin_id'] = admin['id']
                 request.session['provider_slug'] = provider['slug']
                 request.session['token'] = token
-                return {"message": "Login successful", "username": admin['username'], "token": token}
+                return {
+                    "message": "Login successful",
+                    "username": admin['username'],
+                    "token": token,
+                    "is_super_admin": bool(admin.get('is_super_admin', False)),
+                    "provider_slug": provider['slug'],
+                }
     except Exception as e:
         logger.error(f"Error checking provider admins: {e}")
     
@@ -393,11 +480,18 @@ def api_login(request: Request, credentials: schemas.LoginCredentials):
     if admin_user and admin_pass:
         if credentials.username == admin_user and credentials.password == admin_pass:
             # Generate a simple token
-            token = secrets.token_urlsafe(32)
+            token = f"sa_{secrets.token_urlsafe(32)}"
             request.session['is_admin'] = True
+            request.session['is_super_admin'] = True
             request.session['username'] = credentials.username
             request.session['token'] = token
-            return {"message": "Login successful", "username": credentials.username, "token": token}
+            return {
+                "message": "Login successful",
+                "username": credentials.username,
+                "token": token,
+                "is_super_admin": True,
+                "provider_slug": None,
+            }
     
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -413,6 +507,99 @@ def api_logout(request: Request):
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url='/', status_code=303)
+
+
+# ==================== SUPER ADMIN API ROUTES ====================
+
+@app.get("/api/super-admin/dashboard")
+def api_super_admin_dashboard(request: Request):
+    """Get platform-wide stats for super admin."""
+    require_super_admin(request)
+    from app import crud_providers
+
+    stats = crud_providers.get_platform_stats()
+    return serialize_mongo(stats.dict() if hasattr(stats, "dict") else stats)
+
+
+@app.get("/api/super-admin/providers")
+def api_super_admin_list_providers(request: Request):
+    """List all providers for super admin management."""
+    require_super_admin(request)
+    from app import crud_providers
+
+    providers = crud_providers.list_providers(active_only=False)
+    return serialize_mongo(providers)
+
+
+@app.post("/api/super-admin/providers")
+def api_super_admin_create_provider(request: Request, payload: ProviderCreatePayload):
+    """Create a new provider."""
+    require_super_admin(request)
+    from app import crud_providers
+
+    provider_data = {
+        "name": payload.name.strip(),
+        "slug": payload.slug.strip().lower(),
+        "contact_email": payload.contact_email,
+        "contact_phone": payload.contact_phone,
+        "address": payload.address,
+        "settings": {
+            "rate_per_unit": payload.rate_per_unit,
+            "currency": "KES",
+        },
+        "created_by": request.session.get("username"),
+    }
+
+    try:
+        provider = crud_providers.create_provider(provider_data)
+        return {"message": "Provider created", "provider": serialize_mongo(provider)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.put("/api/super-admin/providers/{provider_slug}")
+def api_super_admin_update_provider(
+    provider_slug: str,
+    request: Request,
+    payload: ProviderUpdatePayload,
+):
+    """Update provider profile fields."""
+    require_super_admin(request)
+    from app import crud_providers
+
+    update_data = {k: v for k, v in payload.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields provided for update")
+
+    provider = crud_providers.update_provider(provider_slug, update_data)
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    return {"message": "Provider updated", "provider": serialize_mongo(provider)}
+
+
+@app.post("/api/super-admin/providers/{provider_slug}/activate")
+def api_super_admin_activate_provider(provider_slug: str, request: Request):
+    """Activate provider."""
+    require_super_admin(request)
+    from app import crud_providers
+
+    changed = crud_providers.activate_provider(provider_slug)
+    if not changed:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return {"message": "Provider activated", "provider_slug": provider_slug}
+
+
+@app.post("/api/super-admin/providers/{provider_slug}/deactivate")
+def api_super_admin_deactivate_provider(provider_slug: str, request: Request):
+    """Deactivate provider."""
+    require_super_admin(request)
+    from app import crud_providers
+
+    changed = crud_providers.deactivate_provider(provider_slug)
+    if not changed:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return {"message": "Provider deactivated", "provider_slug": provider_slug}
 
 
 # ==================== ADMIN API ROUTES ====================
@@ -546,7 +733,27 @@ def api_add_reading(customer_id: int, request: Request, reading_data: schemas.Me
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     reading = crud.add_reading(customer_id, reading_data.reading_value)
-    return {"message": "Reading added", "reading_id": reading.get("id")}
+    message = "Reading marked as missing" if reading_data.reading_value is None else "Reading saved"
+    invoice_result = maybe_generate_monthly_invoice(customer_id, reading)
+
+    if invoice_result.get("generated"):
+        notify_status = invoice_result.get("notification_status", "unknown")
+        message = (
+            f"Reading saved. Invoice #{invoice_result.get('invoice_id')} generated "
+            f"and notification status is {notify_status}."
+        )
+    elif invoice_result.get("reason") == "invoice_exists_for_month":
+        message = (
+            f"Reading saved. Monthly invoice already exists "
+            f"(Invoice #{invoice_result.get('invoice_id')})."
+        )
+
+    return {
+        "message": message,
+        "reading_id": reading.get("id"),
+        "status": reading.get("status"),
+        "invoice": invoice_result,
+    }
 
 
 @app.get("/api/admin/invoices")
@@ -567,7 +774,12 @@ def api_generate_invoice(customer_id: int, request: Request):
     if error_message:
         raise HTTPException(status_code=400, detail=error_message)
 
-    return {"message": "Invoice generated", "invoice_id": inv.get("id")}
+    return {
+        "message": "Invoice generated",
+        "invoice_id": inv.get("id"),
+        "notification_status": inv.get("notification_status", "unknown"),
+        "sent_at": inv.get("sent_at"),
+    }
 
 
 @app.post("/api/admin/invoices/bulk-generate")
@@ -579,11 +791,17 @@ def api_bulk_generate_invoices(request: Request, payload: BulkInvoiceGeneratePay
         raise HTTPException(status_code=400, detail="customer_ids cannot be empty")
 
     created_invoice_ids = []
+    notifications_sent = 0
+    notifications_failed = 0
     failures = []
     for customer_id in payload.customer_ids:
         inv, error_message = generate_invoice_for_customer(customer_id)
         if inv:
             created_invoice_ids.append(inv.get("id"))
+            if inv.get("notification_status") == "sent":
+                notifications_sent += 1
+            elif inv.get("notification_status") == "failed":
+                notifications_failed += 1
         else:
             failures.append({"customer_id": customer_id, "reason": error_message})
 
@@ -592,6 +810,8 @@ def api_bulk_generate_invoices(request: Request, payload: BulkInvoiceGeneratePay
         "requested_count": len(payload.customer_ids),
         "created_count": len(created_invoice_ids),
         "failed_count": len(failures),
+        "notifications_sent": notifications_sent,
+        "notifications_failed": notifications_failed,
         "invoice_ids": created_invoice_ids,
         "failures": failures,
     }

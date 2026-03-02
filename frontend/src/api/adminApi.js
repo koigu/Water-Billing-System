@@ -63,3 +63,27 @@ export function fetchRate() {
 export function updateRate(mode, value) {
   return apiPost('/api/admin/rate', { mode, value })
 }
+
+export function fetchSuperAdminDashboard() {
+  return apiGet('/api/super-admin/dashboard')
+}
+
+export function fetchProviders() {
+  return apiGet('/api/super-admin/providers')
+}
+
+export function createProvider(payload) {
+  return apiPost('/api/super-admin/providers', payload).then((res) => res.provider || res)
+}
+
+export function updateProvider(providerSlug, payload) {
+  return apiPut(`/api/super-admin/providers/${providerSlug}`, payload).then((res) => res.provider || res)
+}
+
+export function activateProvider(providerSlug) {
+  return apiPost(`/api/super-admin/providers/${providerSlug}/activate`)
+}
+
+export function deactivateProvider(providerSlug) {
+  return apiPost(`/api/super-admin/providers/${providerSlug}/deactivate`)
+}

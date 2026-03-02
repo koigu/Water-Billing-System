@@ -8,6 +8,7 @@ from pymongo import MongoClient
 from pymongo.collection import Collection
 from dotenv import load_dotenv
 import logging
+import certifi
 
 logger = logging.getLogger("mongodb")
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), override=False)
@@ -15,6 +16,9 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"), o
 # MongoDB configuration
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
 MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "water_billing")
+MONGODB_SERVER_SELECTION_TIMEOUT_MS = int(os.getenv("MONGODB_SERVER_SELECTION_TIMEOUT_MS", "5000"))
+MONGODB_CONNECT_TIMEOUT_MS = int(os.getenv("MONGODB_CONNECT_TIMEOUT_MS", "10000"))
+MONGODB_SOCKET_TIMEOUT_MS = int(os.getenv("MONGODB_SOCKET_TIMEOUT_MS", "20000"))
 
 # Global client instance
 _client = None
@@ -42,7 +46,18 @@ def get_client() -> MongoClient:
     global _client
     if _client is None:
         try:
-            _client = MongoClient(MONGODB_URL, serverSelectionTimeoutMS=5000)
+            client_options = {
+                "serverSelectionTimeoutMS": MONGODB_SERVER_SELECTION_TIMEOUT_MS,
+                "connectTimeoutMS": MONGODB_CONNECT_TIMEOUT_MS,
+                "socketTimeoutMS": MONGODB_SOCKET_TIMEOUT_MS,
+                "retryWrites": True,
+            }
+
+            # Ensure CA bundle is available for TLS verification (Atlas/SRV setups).
+            if MONGODB_URL.startswith("mongodb+srv://") or "tls=true" in MONGODB_URL.lower():
+                client_options["tlsCAFile"] = certifi.where()
+
+            _client = MongoClient(MONGODB_URL, **client_options)
             # Test connection
             _client.admin.command('ping')
             logger.info(f"Connected to MongoDB at {MONGODB_URL}")

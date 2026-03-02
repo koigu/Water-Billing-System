@@ -1,9 +1,17 @@
 :root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: Manrope, 'Segoe UI Variable', 'Avenir Next', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #0c1b33;
-  background-color: #f4f7fb;
+  color: #0f1d34;
+  background-color: #f3f7ff;
+  --surface: #ffffff;
+  --surface-soft: #f8fbff;
+  --border: #dce7f6;
+  --text-muted: #5b6b8b;
+  --primary: #0b5ed7;
+  --primary-dark: #0949a8;
+  --shadow-soft: 0 10px 30px rgba(8, 39, 94, 0.08);
+  --shadow-card: 0 18px 34px rgba(13, 35, 78, 0.09);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -47,6 +55,10 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(11, 94, 215, 0.08), transparent 33%),
+    radial-gradient(circle at 92% 100%, rgba(32, 201, 151, 0.08), transparent 30%),
+    #f3f7ff;
 }
 
 .app-shell {
@@ -150,10 +162,17 @@ body {
 }
 
 .card {
-  background: #ffffff;
-  border-radius: 0.9rem;
-  padding: 1rem 1.1rem;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1.05rem 1.15rem;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 38px rgba(13, 35, 78, 0.12);
 }
 
 .card__title {
@@ -171,7 +190,7 @@ body {
 
 .card__meta {
   font-size: 0.8rem;
-  color: #6b7a96;
+  color: var(--text-muted);
 }
 
 .badge {
@@ -201,20 +220,20 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.6rem;
+  border-radius: 0.72rem;
   border: 1px solid transparent;
   padding: 0.45rem 0.9rem;
   font-size: 0.9rem;
   font-weight: 500;
   font-family: inherit;
-  background-color: #0b5ed7;
+  background-color: var(--primary);
   color: #ffffff;
   cursor: pointer;
   transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.08s ease;
 }
 
 .button:hover {
-  background-color: #0949a8;
+  background-color: var(--primary-dark);
   box-shadow: 0 12px 24px rgba(11, 94, 215, 0.32);
   transform: translateY(-1px);
 }
@@ -258,24 +277,28 @@ body {
 .input,
 .select {
   width: 100%;
-  border-radius: 0.5rem;
-  border: 1px solid #d4dbea;
-  padding: 0.45rem 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px solid #cfdced;
+  padding: 0.5rem 0.7rem;
   font-size: 0.9rem;
   font-family: inherit;
+  background: #fff;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.08s ease;
 }
 
 .input:focus,
 .select:focus {
-  outline: 2px solid rgba(11, 94, 215, 0.35);
-  border-color: transparent;
+  outline: none;
+  border-color: rgba(11, 94, 215, 0.45);
+  box-shadow: 0 0 0 3px rgba(11, 94, 215, 0.16);
 }
 
 .table-wrapper {
   margin-top: 1rem;
   background: #ffffff;
-  border-radius: 0.9rem;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
   overflow: hidden;
 }
 
@@ -293,7 +316,7 @@ td {
 }
 
 th {
-  background: #f7f9fc;
+  background: #f3f8ff;
   font-weight: 600;
   font-size: 0.78rem;
   text-transform: uppercase;
@@ -303,6 +326,22 @@ th {
 
 tr:last-child td {
   border-bottom: none;
+}
+
+tbody tr:hover {
+  background: rgba(11, 94, 215, 0.04);
+}
+
+.invoice-id-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  background: rgba(11, 94, 215, 0.1);
+  color: #0a4aad;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  font-family: 'JetBrains Mono', 'Consolas', monospace;
 }
 
 .cycle-ops {
@@ -603,6 +642,26 @@ tr:last-child td {
   gap: 0.65rem;
 }
 
+.super-admin-form {
+  margin-top: 1rem;
+  background: #ffffff;
+  border-radius: 0.9rem;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  padding: 1rem;
+}
+
+.super-admin-form__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.super-admin-form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -650,5 +709,28 @@ tr:last-child td {
   .login-panel {
     width: min(100%, 520px);
     justify-self: center;
+  }
+}
+
+@media print {
+  .sidebar,
+  .main__topbar .button,
+  .page-header .button,
+  button {
+    display: none !important;
+  }
+
+  .app-shell {
+    display: block;
+  }
+
+  .main {
+    padding: 0;
+    background: #fff;
+  }
+
+  .table-wrapper {
+    box-shadow: none;
+    border: 1px solid #ddd;
   }
 }

@@ -88,9 +88,10 @@ export default function ReadingsPage() {
     setMessage('')
     try {
       const customerId = Number(form.customer_id)
-      const readingValue = Number(form.reading_value)
-      await addReading(customerId, readingValue)
-      setMessage('Reading recorded successfully.')
+      const hasReading = String(form.reading_value).trim() !== ''
+      const readingValue = hasReading ? Number(form.reading_value) : null
+      const result = await addReading(customerId, readingValue)
+      setMessage(result?.message || (hasReading ? 'Reading recorded successfully.' : 'Reading marked as missing.'))
       setForm((prev) => ({ ...prev, reading_value: '' }))
       const readingsRes = await fetchReadings()
       setReadings(readingsRes)
@@ -101,13 +102,20 @@ export default function ReadingsPage() {
     }
   }
 
+  const handleDownloadPdf = () => {
+    window.print()
+  }
+
   return (
     <div>
       <div className="page-header">
         <div>
           <h2 className="page-title">Meter Readings</h2>
-          <p className="page-description">Record and review meter readings</p>
+          <p className="page-description">Record monthly meter readings and review status</p>
         </div>
+        <button className="button button--ghost" type="button" onClick={handleDownloadPdf}>
+          Download PDF
+        </button>
       </div>
 
       <form
@@ -133,8 +141,7 @@ export default function ReadingsPage() {
           min="0"
           value={form.reading_value}
           onChange={handleChange}
-          placeholder="Reading value"
-          required
+          placeholder="Reading value (leave blank if no reading)"
         />
         <button className="button" type="submit" disabled={submitting}>
           {submitting ? 'Saving...' : 'Record Reading'}
@@ -202,7 +209,8 @@ export default function ReadingsPage() {
                 <th>ID</th>
                 <th>Customer</th>
                 <th>Reading (m3)</th>
-                <th>Recorded At</th>
+                <th>Status</th>
+                <th>Month</th>
               </tr>
             </thead>
             <tbody>
@@ -212,8 +220,12 @@ export default function ReadingsPage() {
                   <td>
                     #{r.customer_id} - {customerMap[r.customer_id] || 'Unknown'}
                   </td>
-                  <td>{r.reading_value}</td>
-                  <td>{new Date(r.recorded_at).toLocaleString()}</td>
+                  <td>{r.reading_value ?? '-'}</td>
+                  <td>{r.status || (r.reading_value == null ? 'missing' : 'recorded')}</td>
+                  <td>
+                    {r.reading_month ||
+                      new Date(r.recorded_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                  </td>
                 </tr>
               ))}
             </tbody>

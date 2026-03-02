@@ -102,6 +102,10 @@ export default function InvoicesPage() {
     }
   }
 
+  const handleDownloadPdf = () => {
+    window.print()
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -109,6 +113,9 @@ export default function InvoicesPage() {
           <h2 className="page-title">Invoices</h2>
           <p className="page-description">Track billing status and payments</p>
         </div>
+        <button className="button button--ghost" type="button" onClick={handleDownloadPdf}>
+          Download PDF
+        </button>
       </div>
 
       {selectedInvoiceIds.length > 0 && (
@@ -129,10 +136,10 @@ export default function InvoicesPage() {
           <table>
             <thead>
               <tr>
+                <th>Invoice ID</th>
                 <th>
                   <input type="checkbox" checked={allSelected} onChange={handleToggleSelectAll} />
                 </th>
-                <th>ID</th>
                 <th>Customer ID</th>
                 <th>Amount</th>
                 <th>Due Date</th>
@@ -146,13 +153,15 @@ export default function InvoicesPage() {
               {invoices.map((inv) => (
                 <tr key={inv.id}>
                   <td>
+                    <span className="invoice-id-chip">#{inv.id}</span>
+                  </td>
+                  <td>
                     <input
                       type="checkbox"
                       checked={selectedInvoiceIds.includes(inv.id)}
                       onChange={() => handleToggleInvoice(inv.id)}
                     />
                   </td>
-                  <td>{inv.id}</td>
                   <td>{inv.customer_id}</td>
                   <td>{Number(inv.amount || 0).toFixed(2)} KES</td>
                   <td>{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '-'}</td>

@@ -31,13 +31,14 @@ class CustomerWithReadings(Customer):
 
 
 class MeterReadingCreate(BaseModel):
-    reading_value: float
+    reading_value: Optional[float] = None
 
 
 class MeterReading(BaseModel):
     id: int
     customer_id: int
-    reading_value: float
+    reading_value: Optional[float] = None
+    status: str = "recorded"
     recorded_at: datetime
     model_config = {"populate_by_name": True}
 
