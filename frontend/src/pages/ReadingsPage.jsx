@@ -14,6 +14,23 @@ export default function ReadingsPage() {
     date_from: '',
     date_to: '',
   })
+  const monthLabels = useMemo(
+    () => [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ],
+    []
+  )
 
   const customerMap = useMemo(() => {
     const map = {}
@@ -44,6 +61,49 @@ export default function ReadingsPage() {
       return true
     })
   }, [readings, filters])
+
+  const readingRows = useMemo(() => {
+    const rows = new Map()
+    const resolveMonthIndex = (reading) => {
+      if (reading.reading_month) {
+        const parsed = new Date(reading.reading_month)
+        if (!Number.isNaN(parsed.getTime())) return parsed.getMonth()
+      }
+      if (reading.recorded_at) {
+        const parsed = new Date(reading.recorded_at)
+        if (!Number.isNaN(parsed.getTime())) return parsed.getMonth()
+      }
+      return null
+    }
+
+    for (const reading of filteredReadings) {
+      const monthIndex = resolveMonthIndex(reading)
+      if (monthIndex == null) continue
+
+      const customerId = reading.customer_id
+      if (!rows.has(customerId)) {
+        rows.set(customerId, {
+          customer_id: customerId,
+          customer_name: customerMap[customerId] || 'Unknown',
+          months: Array(12).fill('-'),
+          monthDates: Array(12).fill(null),
+        })
+      }
+
+      const row = rows.get(customerId)
+      const recordedAt = reading.recorded_at ? new Date(reading.recorded_at).getTime() : null
+      const currentDate = row.monthDates[monthIndex]
+      const shouldReplace =
+        currentDate == null || (recordedAt != null && recordedAt >= currentDate)
+
+      if (shouldReplace) {
+        row.months[monthIndex] = reading.reading_value ?? '-'
+        row.monthDates[monthIndex] = recordedAt ?? currentDate ?? 0
+      }
+    }
+
+    return Array.from(rows.values()).sort((a, b) => String(a.customer_id).localeCompare(String(b.customer_id)))
+  }, [filteredReadings, customerMap])
 
   const loadData = async () => {
     setLoading(true)
@@ -201,31 +261,28 @@ export default function ReadingsPage() {
         </div>
       )}
 
-      {!loading && filteredReadings.length > 0 && (
+      {!loading && readingRows.length > 0 && (
         <div className="table-wrapper" style={{ marginTop: '1rem' }}>
           <table>
             <thead>
               <tr>
-                <th>ID</th>
+                <th>Customer ID</th>
                 <th>Customer</th>
-                <th>Reading (m3)</th>
-                <th>Status</th>
-                <th>Month</th>
+                {monthLabels.map((label) => (
+                  <th key={label}>{label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filteredReadings.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.id}</td>
+              {readingRows.map((row) => (
+                <tr key={row.customer_id}>
+                  <td>{row.customer_id}</td>
                   <td>
-                    #{r.customer_id} - {customerMap[r.customer_id] || 'Unknown'}
+                    #{row.customer_id} - {row.customer_name}
                   </td>
-                  <td>{r.reading_value ?? '-'}</td>
-                  <td>{r.status || (r.reading_value == null ? 'missing' : 'recorded')}</td>
-                  <td>
-                    {r.reading_month ||
-                      new Date(r.recorded_at).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
-                  </td>
+                  {row.months.map((value, index) => (
+                    <td key={`${row.customer_id}-${monthLabels[index]}`}>{value}</td>
+                  ))}
                 </tr>
               ))}
             </tbody>
