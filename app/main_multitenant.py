@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 from typing import Optional, List
 from bson import ObjectId
@@ -54,6 +55,14 @@ app.add_middleware(
 app.add_middleware(ErrorHandlingMiddleware)
 app.add_middleware(ProviderContextMiddleware)
 
+# Add SessionMiddleware FIRST (before other middleware)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key="your-session-secret-change-in-production",
+    max_age=86400,  # 24 hours
+    same_site="lax"
+)
+
 # Mount static files
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -73,13 +82,15 @@ def startup_event():
     except Exception as e:
         logger.error(f"Failed to initialize master database: {e}")
     
-    # NOTE: Scheduler temporarily disabled due to crash issues
-    # Will be re-enabled after fixing the reminder job
-    # scheduler = BackgroundScheduler()
-    # scheduler.add_job(check_and_remind, "interval", minutes=60, next_run_time=datetime.utcnow())
-    # scheduler.start()
-    # app.state.scheduler = scheduler
-    logger.info("Scheduler disabled - reminder job temporarily disabled")
+    try:
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(check_and_remind, "interval", minutes=60)
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("Scheduler enabled safely")
+    except Exception as e:
+        logger.error(f"Scheduler failed to start: {e}")
+        logger.info("Scheduler disabled - using manual reminders")
     
     logger.info("Application started successfully")
 
@@ -442,10 +453,10 @@ def readings_page(request: Request):
 
 
 @app.post("/customers/{customer_id}/readings")
-def add_reading(customer_id: int, reading_value: float = Form(...)):
+def add_reading(request: Request, customer_id: int, reading_value: float = Form(...)):
     """Add a meter reading."""
     # Note: In production, add admin check
-    slug = get_provider_slug(provide_request())
+    slug = get_provider_slug(request)
     customer = crud.get_customer(slug, customer_id)
     
     if not customer:
@@ -500,9 +511,9 @@ def invoices_page(request: Request):
 
 
 @app.post("/invoices/generate/{customer_id}")
-def generate_invoice(customer_id: int):
+def generate_invoice(request: Request, customer_id: int):
     """Generate an invoice for a customer."""
-    slug = get_provider_slug(provide_request())
+    slug = get_provider_slug(request)
     
     rate = crud.get_effective_rate(slug)
     calc = crud.calculate_amount_from_readings(slug, customer_id, rate)
@@ -525,9 +536,9 @@ def generate_invoice(customer_id: int):
 
 
 @app.post("/invoices/{invoice_id}/pay")
-def pay_invoice(invoice_id: int):
+def pay_invoice(request: Request, invoice_id: int):
     """Mark an invoice as paid."""
-    slug = get_provider_slug(provide_request())
+    slug = get_provider_slug(request)
     
     inv = crud.mark_invoice_paid(slug, invoice_id)
     if not inv:
@@ -657,8 +668,8 @@ def customer_portal_page(request: Request):
     return templates.TemplateResponse("customer_portal.html", {"request": request})
 
 
-@app.post("/api/auth/login")
-def customer_login(login_data: dict):
+@app.post("/api/customer/login")
+def customer_login(request: Request, login_data: dict):
     """Customer login endpoint."""
     username = login_data.get("username")
     password = login_data.get("password")
@@ -666,7 +677,7 @@ def customer_login(login_data: dict):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password required")
     
-    slug = get_provider_slug(provide_request())
+    slug = get_provider_slug(request)
     auth = crud.authenticate_customer(slug, username, password)
     
     if not auth:

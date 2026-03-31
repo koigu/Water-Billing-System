@@ -19,7 +19,7 @@ async function parseResponse(res, method, path) {
 }
 
 export async function customerLogin(username, password) {
-  const path = '/api/auth/login'
+  const path = '/api/customer/login'
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     credentials: 'include',
