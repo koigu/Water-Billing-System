@@ -1,4 +1,13 @@
-- [x] 1. Add SessionMiddleware to app/main_multitenant.py
-- [x] 2. Fix 4 broken routes (add request param)
-- [x] 3. Fix duplicate login route
-- [x] 4. Re-enable scheduler safely\n- [x] 5. Test server (uvicorn running)\n\n✅ All critical bugs fixed!\n\n**Test:**\nhttp://localhost:8000/health\nhttp://localhost:8000/docs
+# Water Billing System Cleanup TODO
+Track progress on cleaning git to only push app/ and frontend/ files.
+
+## Steps:
+- [ ] Step 1: Update .gitignore with new patterns for debug/scripts/tests/docs
+- [ ] Step 2: Clean git tracked unnecessary files (`git rm --cached ...`)
+- [ ] Step 3: Commit .gitignore changes
+- [ ] Step 4: Verify `git status` shows only app/, frontend/, .gitignore, TODO.md
+- [ ] Step 5: Final commit/push
+
+- [x] Step 1: Update .gitignore with new patterns for debug/scripts/tests/docs
+- [x] Step 2: Clean git tracked unnecessary files (`git rm --cached ...`)
+Current progress: Step 3 - Commit .gitignore changes

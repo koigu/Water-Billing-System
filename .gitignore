@@ -32,3 +32,45 @@ Thumbs.db
 # Build
 dist/
 build/
+
+# Project-specific ignores: Debug/Test/Dev files
+test*.py
+debug*.py
+check*.py
+fix*.py
+sync*.py
+audit*.py
+cleanup*.py
+auth*.py
+simple*.py
+*.bat
+run*.bat
+create*.bat
+update*.bat
+start*.bat
+*.js !app/**/*.js !frontend/**/*.js
+
+# Docs (keep TODO.md)
+*.md
+!TODO.md
+!app/**/*.md
+!frontend/**/*.md
+QUICK*.md
+FIXES*.md
+NOTIFICATION*.md
+TODO_*FIX*.md
+TODO_*MD
+
+# Non-essential dirs/files
+scripts/
+tests/
+templates/
+static/
+cookies.txt
+requirements*.txt
+setup*.js
+
+# IDE/OS extra
+*.swp
+*~
+Thumbs.db
