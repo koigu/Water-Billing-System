@@ -25,25 +25,20 @@
         }
       ]
     },
-    "static-copy": {
-      "inputs": [
-        {
-          "step": "frontend-build"
-        }
-      ],
-      "commands": [
-        {
-          "cmd": "rm -rf static/* && cp -r frontend/dist/* static/",
-          "customName": "Copy frontend dist to static"
-        }
-      ]
-    },
     "backend-deps": {
       "caches": ["pip"],
       "commands": [
         {
           "cmd": "pip install -r requirements.txt",
           "customName": "Install backend deps from requirements.txt"
+        }
+      ]
+    },
+    "copy-frontend": {
+      "commands": [
+        {
+          "cmd": "cp -r frontend/dist/* static/",
+          "customName": "Copy frontend build to static"
         }
       ]
     }
@@ -53,12 +48,15 @@
     "paths": [
       "node_modules/.bin"
     ],
-"inputs": [
+    "inputs": [
       {
-        "step": "static-copy"
+        "step": "frontend-build"
       },
       {
         "step": "backend-deps"
+      },
+      {
+        "step": "copy-frontend"
       }
     ]
   }
