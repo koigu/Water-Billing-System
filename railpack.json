@@ -26,8 +26,8 @@
           "customName": "Build frontend"
         },
         {
-          "cmd": "cp -r frontend/dist/* static/",
-          "customName": "Copy dist to static"
+          "cmd": "rm -rf static/* && cp -r frontend/dist/* static/",
+          "customName": "Copy frontend dist to static"
         }
       ]
     },
