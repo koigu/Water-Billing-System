@@ -25,6 +25,17 @@
         }
       ]
     },
+
+
+    "static-copy": {
+      "commands": [
+        {
+          "cmd": "rm -rf static/* && cp -r frontend/dist/* static/",
+          "customName": "Copy frontend dist to static"
+        }
+      ]
+    },
+
     "backend-deps": {
       "caches": ["pip"],
       "commands": [
