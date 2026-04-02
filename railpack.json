@@ -12,30 +12,16 @@
     }
   },
   "steps": {
-"frontend-build": {
+    "frontend-build": {
       "caches": ["npm"],
       "commands": [
         {
-          "cmd": "cd frontend && npm ci",
+          "cmd": "npm ci --prefix frontend",
           "customName": "Install frontend deps"
         },
         {
-          "cmd": "cd frontend && npm run build",
+          "cmd": "npm run build --prefix frontend",
           "customName": "Build frontend"
-        }
-      ]
-    },
-    "static-copy": {
-      "inputs": [
-        {
-          "step": "frontend-build",
-          "include": ["frontend/dist/**"] 
-        }
-      ],
-      "commands": [
-        {
-          "cmd": "rm -rf static/* && cp -r frontend/dist/* static/",
-          "customName": "Copy frontend dist to static"
         }
       ]
     },
@@ -44,23 +30,29 @@
       "commands": [
         {
           "cmd": "pip install -r requirements.txt",
-          "customName": "Install backend deps from requirements.txt"
+          "customName": "Install backend deps"
         }
       ]
     }
   },
   "deploy": {
     "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
-    "paths": ["node_modules/.bin"],
+    "paths": [
+      "node_modules/.bin"
+    ],
     "inputs": [
-      "...",
       {
-        "step": "static-copy"
+        "step": "frontend-build"
       },
       {
         "step": "backend-deps"
       }
+    ],
+    "commands": [
+      {
+        "cmd": "cp -r frontend/dist/* static/",
+        "customName": "Copy frontend dist to static"
+      }
     ]
   }
 }
-
