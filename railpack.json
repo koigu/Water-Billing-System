@@ -16,15 +16,16 @@
       "caches": ["npm"],
       "commands": [
         {
-          "cmd": "cd frontend && npm ci",
+          "cmd": "npm ci --prefix frontend",
           "customName": "Install frontend deps"
         },
         {
-          "cmd": "cd frontend && npm run build",
+          "cmd": "npm run build --prefix frontend",
           "customName": "Build frontend"
         }
       ]
     },
+
     "backend-deps": {
       "caches": ["pip"],
       "commands": [
@@ -39,6 +40,24 @@
         {
           "cmd": "cp -r frontend/dist/* static/",
           "customName": "Copy frontend build to static"
+
+
+    "static-copy": {
+      "commands": [
+        {
+          "cmd": "cp -r frontend/dist/* static/",
+          "customName": "Copy frontend dist to static"
+        }
+      ]
+    },
+
+    "backend-deps": {
+      "caches": ["pip"],
+      "commands": [
+        {
+          "cmd": "pip install -r requirements.txt",
+          "customName": "Install backend deps"
+
         }
       ]
     }
@@ -48,5 +67,16 @@
     "paths": [
       "node_modules/.bin"
     ]
+
+    ],
+    "inputs": [
+      {
+        "step": "frontend-build"
+      },
+      {
+        "step": "backend-deps"
+      }
+    ],
+
   }
 }
