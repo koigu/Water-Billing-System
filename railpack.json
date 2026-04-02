@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "python",
+  "caches": {
+    "npm": {
+      "directory": "/root/.npm",
+      "type": "shared"
+    },
+    "pip": {
+      "directory": "/root/.cache/pip",
+      "type": "shared"
+    }
+  },
+  "steps": {
+"frontend-build": {
+      "caches": ["npm"],
+      "commands": [
+        {
+          "cmd": "cd frontend && npm ci",
+          "customName": "Install frontend deps"
+        },
+        {
+          "cmd": "cd frontend && npm run build",
+          "customName": "Build frontend"
+        }
+      ]
+    },
+    "static-copy": {
+      "inputs": [
+        {
+          "step": "frontend-build",
+          "include": ["frontend/dist/**"] 
+        }
+      ],
+      "commands": [
+        {
+          "cmd": "rm -rf static/* && cp -r frontend/dist/* static/",
+          "customName": "Copy frontend dist to static"
+        }
+      ]
+    },
+    "backend-deps": {
+      "caches": ["pip"],
+      "commands": [
+        {
+          "cmd": "pip install -r requirements.txt",
+          "customName": "Install backend deps from requirements.txt"
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+    "paths": ["node_modules/.bin"],
+    "inputs": [
+      "...",
+      {
+        "step": "static-copy"
+      },
+      {
+        "step": "backend-deps"
+      }
+    ]
+  }
+}
+
