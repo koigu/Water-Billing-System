@@ -52,6 +52,9 @@
         "step": "frontend-build"
       },
       {
+        "step": "static-copy"
+      },
+      {
         "step": "backend-deps"
       }
     ]
