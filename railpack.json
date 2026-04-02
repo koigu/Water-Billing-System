@@ -53,8 +53,7 @@
     "paths": [
       "node_modules/.bin"
     ],
-    "inputs": [
-      "...",
+"inputs": [
       {
         "step": "static-copy"
       },
