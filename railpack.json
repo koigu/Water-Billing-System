@@ -1,6 +1,8 @@
 {
   "$schema": "https://schema.railpack.com",
-  "provider": "python",
+  "packages": {
+    "node": "22"
+  },
   "caches": {
     "npm": {
       "directory": "/root/.npm",
@@ -22,20 +24,13 @@
         {
           "cmd": "npm run build --prefix frontend",
           "customName": "Build frontend"
-        }
-      ]
-    },
-
-
-    "static-copy": {
-      "commands": [
+        },
         {
-          "cmd": "rm -rf static/* && cp -r frontend/dist/* static/",
-          "customName": "Copy frontend dist to static"
+          "cmd": "cp -r frontend/dist/* static/",
+          "customName": "Copy dist to static"
         }
       ]
     },
-
     "backend-deps": {
       "caches": ["pip"],
       "commands": [
@@ -48,21 +43,12 @@
   },
   "deploy": {
     "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
-    "paths": [
-      "node_modules/.bin"
-    ],
     "inputs": [
       {
         "step": "frontend-build"
       },
       {
         "step": "backend-deps"
-      }
-    ],
-    "commands": [
-      {
-        "cmd": "cp -r frontend/dist/* static/",
-        "customName": "Copy frontend dist to static"
       }
     ]
   }
