@@ -24,9 +24,34 @@
         {
           "cmd": "npm run build --prefix frontend",
           "customName": "Build frontend"
+
         },
+
+        }
+      ]
+    },
+
+    "backend-deps": {
+      "caches": ["pip"],
+      "commands": [
         {
-          "cmd": "rm -rf static/* && cp -r frontend/dist/* static/",
+          "cmd": "pip install -r requirements.txt",
+          "customName": "Install backend deps from requirements.txt"
+        }
+      ]
+    },
+    "copy-frontend": {
+      "commands": [
+        {
+          "cmd": "cp -r frontend/dist/* static/",
+          "customName": "Copy frontend build to static"
+
+
+    "static-copy": {
+      "commands": [
+
+        {
+          "cmd": "cp -r frontend/dist/* static/",
           "customName": "Copy frontend dist to static"
         }
       ]
@@ -37,12 +62,21 @@
         {
           "cmd": "pip install -r requirements.txt",
           "customName": "Install backend deps"
+
         }
       ]
     }
   },
   "deploy": {
     "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+
+
+    "paths": [
+      "node_modules/.bin"
+    ]
+
+    ],
+
     "inputs": [
       {
         "step": "frontend-build"
@@ -50,6 +84,9 @@
       {
         "step": "backend-deps"
       }
+
     ]
+    ],
+
   }
 }
