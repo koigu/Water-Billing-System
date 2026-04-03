@@ -24,14 +24,16 @@
     "static-copy": {
       "inputs": [
         {
-          "step": "frontend-build",
-          "include": ["frontend/dist/**"]
+          "cmd": "npm run build --prefix frontend",
+          "customName": "Build frontend"
         }
-      ],
+      ]
+    },
+    "static-copy": {
       "commands": [
         {
-          "cmd": "sh -c 'if [ -d frontend/dist ]; then rm -rf static/* && cp -r frontend/dist/* static/; else echo \"No frontend/dist to copy, skipping\"; fi'",
-          "customName": "Copy frontend dist to static (if present)"
+          "cmd": "cp -r frontend/dist/* static/",
+          "customName": "Copy frontend dist to static"
         }
       ]
     },
@@ -50,6 +52,9 @@
     "paths": ["node_modules/.bin"],
     "inputs": [
       "...",
+      {
+        "step": "static-copy"
+      },
       {
         "step": "static-copy"
       },
