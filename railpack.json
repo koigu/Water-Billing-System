@@ -39,7 +39,7 @@
       "caches": ["pip"],
       "commands": [
         {
-          "cmd": "pip install -r requirements.txt",
+          "cmd": "sh -c 'if [ -f ./requirements.txt ]; then python -m pip install --no-cache-dir -r ./requirements.txt; else echo \"requirements.txt not found in $(pwd)\"; ls -la .; exit 1; fi'",
           "customName": "Install backend deps from requirements.txt"
         }
       ]
