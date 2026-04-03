@@ -20,6 +20,7 @@ __pycache__/
 venv/
 env/
 .venv/
+app/venv
 
 # Editor settings
 .vscode/
@@ -74,3 +75,4 @@ setup*.js
 *.swp
 *~
 Thumbs.db
+/app/venv

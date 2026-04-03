@@ -1,6 +1,7 @@
-# Railpack Configuration for Water-Billing-System
+# Water Billing System - Railpack Deploy Fix Plan
+Approved plan implementation steps:
 
-## Steps:
+## Steps to Complete:
 
 - [x] 1. Create railpack.json (initial)
 - [x] 2. Create requirements.txt with full deps

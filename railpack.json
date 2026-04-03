@@ -1,8 +1,6 @@
 {
   "$schema": "https://schema.railpack.com",
-  "packages": {
-    "node": "22"
-  },
+  "provider": "python",
   "caches": {
     "npm": {
       "directory": "/root/.npm",
@@ -18,9 +16,13 @@
       "caches": ["npm"],
       "commands": [
         {
-          "cmd": "npm ci --prefix frontend",
-          "customName": "Install frontend deps"
-        },
+          "cmd": "sh -c 'if [ -d frontend ]; then cd frontend && npm ci && npm run build; else echo \"No frontend directory, skipping\"; fi'",
+          "customName": "Build frontend (if present)"
+        }
+      ]
+    },
+    "static-copy": {
+      "inputs": [
         {
           "cmd": "npm run build --prefix frontend",
           "customName": "Build frontend"
@@ -46,10 +48,12 @@
     }
   },
   "deploy": {
-    "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+    "startCommand": "uvicorn app.main_multitenant:app --host 0.0.0.0 --port $PORT",
+    "paths": ["node_modules/.bin"],
     "inputs": [
+      "...",
       {
-        "step": "frontend-build"
+        "step": "static-copy"
       },
       {
         "step": "static-copy"
