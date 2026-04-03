@@ -1,13 +1,17 @@
-# Railpack Configuration for Water-Billing-System
+# Water Billing System - Railpack Deploy Fix Plan
+Approved plan implementation steps:
 
-## Steps:
+## Steps to Complete:
 
-- [x] 1. Create railpack.json (frontend build, copy to static, pip deps, python deploy)
-- [ ] 2. Create requirements.txt with full deps
-- [ ] 3. Update railpack to use requirements.txt
-- [ ] 4. Test railpack config
-- [ ] 5. Fix frontend fetch/credentials (investigate api calls, CORS)
-- [ ] 6. Complete task
+- [ ] 1. Update railpack.json: Full replacement with provided JSON content.
+- [ ] 2. Update app/main_multitenant.py: Replace health_check endpoint block with safe version.
+- [ ] 3. Update .gitignore: Append '/app/venv' line.
+- [ ] 4. Git: Create and switch to branch 'fix/deploy-multitenant-railpack'.
+- [ ] 5. Check if app/venv is git tracked; if yes, git rm --cached and re-add .gitignore.
+- [ ] 6. Git add files and commit with messages: "railpack: conditional frontend build; switch deploy to multi-tenant; harden health endpoint; ignore app/venv"
+- [ ] 7. If app/venv rm needed, separate commit: "Remove committed virtualenv and ignore it"
+- [ ] 8. Git push origin fix/deploy-multitenant-railpack
+- [ ] 9. Verify changes and open PR to main.
 
-Progress: Starting implementation.
+Current progress: Starting implementation.
 

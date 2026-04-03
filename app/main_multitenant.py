@@ -142,11 +142,25 @@ def require_admin(request: Request) -> dict:
 @app.get("/health")
 @app.get("/api/health")
 def health_check():
-    """Health check endpoint."""
+    """Health check endpoint (safe)."""
+    master_connected = False
+    try:
+        # call mt_db.is_master_connected() if available, otherwise safely return False
+        is_connected_fn = getattr(mt_db, "is_master_connected", None)
+        if callable(is_connected_fn):
+            try:
+                master_connected = bool(is_connected_fn())
+            except Exception:
+                master_connected = False
+        else:
+            master_connected = False
+    except Exception:
+        master_connected = False
+
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "master_connected": mt_db.is_master_connected()
+        "master_connected": master_connected,
     }
 
 
@@ -480,6 +494,7 @@ def api_add_reading(
     request: Request,
     customer_id: int,
     reading_value: float = Form(...)
+
 ):
     """API: Add a reading."""
     require_admin(request)
@@ -602,6 +617,7 @@ def set_rate(
     request: Request,
     mode: str = Form(...),
     value: float = Form(...)
+
 ):
     """Set rate configuration."""
     require_admin(request)
@@ -630,6 +646,7 @@ def api_set_rate(
     request: Request,
     mode: str = Form(...),
     value: float = Form(...)
+
 ):
     """API: Set rate configuration."""
     require_admin(request)
@@ -830,7 +847,7 @@ def check_and_remind():
                     if customer:
                         # Send notification (simplified)
                         logger.info(f"Sending reminder for invoice {inv.get('id')} to customer {customer.get('id')}")
-                        crud.mark_reminder_sent(slug, inv.get("id"))
+                        crud.mark_reminder_sent(slug, inv.get('id'))
                         reminders_sent += 1
             
             if reminders_sent > 0:
