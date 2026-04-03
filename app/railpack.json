@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "python",
+  "caches": {
+    "npm": {
+      "directory": "/root/.npm",
+      "type": "shared"
+    },
+    "pip": {
+      "directory": "/root/.cache/pip",
+      "type": "shared"
+    }
+  },
+  "steps": {
+    "frontend-build": {
+      "caches": ["npm"],
+      "commands": [
+        {
+          "cmd": "sh -c 'if [ -d frontend ]; then cd frontend && npm ci && npm run build; else echo \"No frontend directory, skipping\"; fi'",
+          "customName": "Build frontend (if present)"
+        }
+      ]
+    },
+    "static-copy": {
+      "inputs": [
+        {
+          "step": "frontend-build"
+        }
+      ],
+      "commands": [
+        {
+          "cmd": "sh -c 'if [ -d frontend/dist ]; then cp -r frontend/dist/* static/; else echo \"No frontend dist, skipping copy\"; fi'",
+          "customName": "Copy frontend dist to static"
+        }
+      ]
+    },
+    "backend-deps": {
+      "caches": ["pip"],
+      "commands": [
+        {
+          "cmd": "pip install -r /app/requirements.txt",
+          "customName": "Install backend deps from requirements.txt"
+        }
+      ]
+    }
+  },
+  "deploy": {
+    "startCommand": "uvicorn app.main_multitenant:app --host 0.0.0.0 --port $PORT",
+    "paths": ["node_modules/.bin"],
+    "inputs": [
+      "...",
+      {
+        "step": "frontend-build"
+      },
+      {
+        "step": "static-copy"
+      },
+      {
+        "step": "backend-deps"
+      }
+    ]
+  }
+}
