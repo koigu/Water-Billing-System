@@ -49,6 +49,7 @@ run*.bat
 create*.bat
 update*.bat
 start*.bat
+requirements.txt
 *.js !app/**/*.js !frontend/**/*.js
 
 # Docs (keep TODO.md)
@@ -68,7 +69,6 @@ tests/
 templates/
 static/
 cookies.txt
-requirements*.txt
 setup*.js
 
 # IDE/OS extra
