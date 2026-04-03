@@ -38,8 +38,8 @@
       "caches": ["pip"],
       "commands": [
         {
-          "cmd": "sh -c 'if [ -f /app/requirements.txt ]; then python -m pip install --no-cache-dir -r /app/requirements.txt; else echo \"requirements.txt not found in $(pwd)\"; ls -la /app; exit 1; fi'",
-          "customName": "Install backend deps from requirements.txt"
+          "cmd": "sh -c 'if [ -f /app/requirements_multitenant.txt ]; then python -m pip install --no-cache-dir -r /app/requirements_multitenant.txt; else echo \"requirements_multitenant.txt not found in $(pwd)\"; ls -la /app; exit 1; fi'",
+          "customName": "Install backend deps from requirements_multitenant.txt"
         }
       ]
     }
