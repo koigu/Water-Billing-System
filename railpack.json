@@ -38,7 +38,7 @@
       "caches": ["pip"],
       "commands": [
         {
-          "cmd": "pip install -r requirements.txt",
+          "cmd": "pip install -r /app/requirements.txt",
           "customName": "Install backend deps from requirements.txt"
         }
       ]
