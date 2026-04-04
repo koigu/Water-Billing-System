@@ -102,19 +102,27 @@ export default function CustomerPortalPage() {
       {!token && (
         <form onSubmit={handleLogin} className="card customer-portal__login">
           <h3 style={{ marginTop: 0 }}>Customer Sign In</h3>
+          <label htmlFor="customer-username">Username</label>
           <input
+            id="customer-username"
+            name="username"
             className="input"
             placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            autoComplete="username"
             required
           />
+          <label htmlFor="customer-password">Password</label>
           <input
+            id="customer-password"
+            name="password"
             className="input"
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
             required
           />
           <button className="button" type="submit">

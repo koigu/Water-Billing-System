@@ -91,25 +91,31 @@ export default function LoginPage({ onLogin }) {
 
           <form onSubmit={handleLogin} className="login__form">
             <div className="login__field">
-              <label className="login__label">Username</label>
+              <label className="login__label" htmlFor="admin-username">Username</label>
               <input
+                id="admin-username"
+                name="username"
                 type="text"
                 className="input login__input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
+                autoComplete="username"
                 required
               />
             </div>
 
             <div className="login__field">
-              <label className="login__label">Password</label>
+              <label className="login__label" htmlFor="admin-password">Password</label>
               <input
+                id="admin-password"
+                name="password"
                 type="password"
                 className="input login__input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
+                autoComplete="current-password"
                 required
               />
             </div>
