@@ -40,6 +40,7 @@ APP_ENV = os.getenv("APP_ENV", "development").lower()
 #CORS Middlewear
 DEFAULT_ALLOWED_ORIGINS = [
     "https://water-billing-system-5q5d.onrender.com",
+    "https://water-billing-system-b7jg.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",

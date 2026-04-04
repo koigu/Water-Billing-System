@@ -23,6 +23,7 @@ class ProviderContextMiddleware(BaseHTTPMiddleware):
     
     # Routes that don't require provider context
     EXEMPT_ROUTES = {
+        "",
         "/",
         "/health",
         "/health/",
@@ -152,6 +153,17 @@ class ProviderContextMiddleware(BaseHTTPMiddleware):
         
         # Handle localhost (no subdomain)
         if host in ("localhost", "127.0.0.1"):
+            return None
+
+        # Ignore common platform-managed preview/service domains.
+        # These subdomains identify the hosting app, not a provider tenant.
+        ignored_host_suffixes = (
+            ".onrender.com",
+            ".vercel.app",
+            ".railway.app",
+            ".up.railway.app",
+        )
+        if any(host.endswith(suffix) for suffix in ignored_host_suffixes):
             return None
         
         # Split host into parts
