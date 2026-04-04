@@ -15,9 +15,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.mongodb_multitenant import mongodb_multitenant as mt_db
-from app.crud_providers import crud_providers
-from app.crud_multitenant import crud_multitenant as crud
+from app import mongodb_multitenant as mt_db
+from app import crud_providers
+from app import crud_multitenant as crud
 from app.middleware import ProviderContextMiddleware, ErrorHandlingMiddleware
 from app.models import (
     AdminLoginRequest,
@@ -79,7 +79,6 @@ app.add_middleware(
     max_age=86400,  # 24 hours
     same_site="none" if APP_ENV == "production" else "lax",
     https_only=APP_ENV == "production",
-    domain=os.getenv("SESSION_COOKIE_DOMAIN") or None,
 )
 
 # Mount static files
@@ -220,14 +219,20 @@ def login(
 
 
 @app.post("/api/admin/login")
-def api_login(credentials: AdminLoginRequest, request: Request = None):
+def api_login(credentials: AdminLoginRequest, request: Request):
     """Admin login API endpoint."""
     import os
     
     # Get credentials
     username = credentials.username
     password = credentials.password
-    provider_slug = credentials.provider_slug
+    provider_slug = (
+        credentials.provider_slug
+        or request.headers.get("X-Provider-Slug")
+        or getattr(request.state, "provider_slug", None)
+        or request.session.get("provider_slug")
+        or request.query_params.get("provider")
+    )
     
     # SECURITY FIX: Require ADMIN_USERNAME and ADMIN_PASSWORD env variables
     # If not set, deny login (no hardcoded defaults!)
@@ -236,10 +241,9 @@ def api_login(credentials: AdminLoginRequest, request: Request = None):
     
     if admin_user and admin_pass:
         if username == admin_user and password == admin_pass:
-            if request:
-                request.session['is_admin'] = True
-                request.session['username'] = username
-                request.session['is_super_admin'] = True
+            request.session['is_admin'] = True
+            request.session['username'] = username
+            request.session['is_super_admin'] = True
             
             return {"message": "Login successful", "username": username}
     
@@ -249,11 +253,10 @@ def api_login(credentials: AdminLoginRequest, request: Request = None):
         admin = authenticate_super_admin(username, password)
         
         if admin:
-            if request:
-                request.session['is_admin'] = True
-                request.session['is_super_admin'] = True
-                request.session['username'] = admin['username']
-                request.session['admin_id'] = admin['id']
+            request.session['is_admin'] = True
+            request.session['is_super_admin'] = True
+            request.session['username'] = admin['username']
+            request.session['admin_id'] = admin['id']
             
             return {
                 "message": "Login successful", 
@@ -270,12 +273,11 @@ def api_login(credentials: AdminLoginRequest, request: Request = None):
             admin = authenticate_admin(username, password, provider_slug)
             
             if admin:
-                if request:
-                    request.session['is_admin'] = True
-                    request.session['is_super_admin'] = admin.get('is_super_admin', False)
-                    request.session['username'] = admin['username']
-                    request.session['admin_id'] = admin['id']
-                    request.session['provider_slug'] = provider_slug
+                request.session['is_admin'] = True
+                request.session['is_super_admin'] = admin.get('is_super_admin', False)
+                request.session['username'] = admin['username']
+                request.session['admin_id'] = admin['id']
+                request.session['provider_slug'] = provider_slug
                 
                 return {
                     "message": "Login successful", 
