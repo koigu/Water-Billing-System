@@ -6,13 +6,18 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 from typing import Optional, List
 from bson import ObjectId
 
-from app import mongodb_multitenant as mt_db
-from app import crud_providers
-from app import crud_multitenant as crud
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from app.mongodb_multitenant import mongodb_multitenant as mt_db
+from app.crud_providers import crud_providers
+from app.crud_multitenant import crud_multitenant as crud
 from app.middleware import ProviderContextMiddleware, ErrorHandlingMiddleware
 from app.models import (
     AdminLoginRequest,
@@ -30,6 +35,18 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("uvicorn")
+APP_ENV = os.getenv("APP_ENV", "development").lower()
+DEFAULT_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", ",".join(DEFAULT_ALLOWED_ORIGINS)).split(",")
+    if origin.strip()
+]
 
 # Initialize templates
 templates_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
@@ -46,13 +63,24 @@ app = FastAPI(
 # Add middleware (order matters - last added is first executed)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
 )
 app.add_middleware(ErrorHandlingMiddleware)
 app.add_middleware(ProviderContextMiddleware)
+
+# Add SessionMiddleware FIRST (before other middleware)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", "your-session-secret-change-in-production"),
+    max_age=86400,  # 24 hours
+    same_site="none" if APP_ENV == "production" else "lax",
+    https_only=APP_ENV == "production",
+    domain=os.getenv("SESSION_COOKIE_DOMAIN") or None,
+)
 
 # Mount static files
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
@@ -73,13 +101,15 @@ def startup_event():
     except Exception as e:
         logger.error(f"Failed to initialize master database: {e}")
     
-    # NOTE: Scheduler temporarily disabled due to crash issues
-    # Will be re-enabled after fixing the reminder job
-    # scheduler = BackgroundScheduler()
-    # scheduler.add_job(check_and_remind, "interval", minutes=60, next_run_time=datetime.utcnow())
-    # scheduler.start()
-    # app.state.scheduler = scheduler
-    logger.info("Scheduler disabled - reminder job temporarily disabled")
+    try:
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(check_and_remind, "interval", minutes=60)
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("Scheduler enabled safely")
+    except Exception as e:
+        logger.error(f"Scheduler failed to start: {e}")
+        logger.info("Scheduler disabled - using manual reminders")
     
     logger.info("Application started successfully")
 
@@ -131,11 +161,25 @@ def require_admin(request: Request) -> dict:
 @app.get("/health")
 @app.get("/api/health")
 def health_check():
-    """Health check endpoint."""
+    """Health check endpoint (safe)."""
+    master_connected = False
+    try:
+        # call mt_db.is_master_connected() if available, otherwise safely return False
+        is_connected_fn = getattr(mt_db, "is_master_connected", None)
+        if callable(is_connected_fn):
+            try:
+                master_connected = bool(is_connected_fn())
+            except Exception:
+                master_connected = False
+        else:
+            master_connected = False
+    except Exception:
+        master_connected = False
+
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "master_connected": mt_db.is_master_connected()
+        "master_connected": master_connected,
     }
 
 
@@ -442,10 +486,10 @@ def readings_page(request: Request):
 
 
 @app.post("/customers/{customer_id}/readings")
-def add_reading(customer_id: int, reading_value: float = Form(...)):
+def add_reading(request: Request, customer_id: int, reading_value: float = Form(...)):
     """Add a meter reading."""
     # Note: In production, add admin check
-    slug = get_provider_slug(provide_request())
+    slug = get_provider_slug(request)
     customer = crud.get_customer(slug, customer_id)
     
     if not customer:
@@ -469,6 +513,7 @@ def api_add_reading(
     request: Request,
     customer_id: int,
     reading_value: float = Form(...)
+
 ):
     """API: Add a reading."""
     require_admin(request)
@@ -500,9 +545,9 @@ def invoices_page(request: Request):
 
 
 @app.post("/invoices/generate/{customer_id}")
-def generate_invoice(customer_id: int):
+def generate_invoice(request: Request, customer_id: int):
     """Generate an invoice for a customer."""
-    slug = get_provider_slug(provide_request())
+    slug = get_provider_slug(request)
     
     rate = crud.get_effective_rate(slug)
     calc = crud.calculate_amount_from_readings(slug, customer_id, rate)
@@ -525,9 +570,9 @@ def generate_invoice(customer_id: int):
 
 
 @app.post("/invoices/{invoice_id}/pay")
-def pay_invoice(invoice_id: int):
+def pay_invoice(request: Request, invoice_id: int):
     """Mark an invoice as paid."""
-    slug = get_provider_slug(provide_request())
+    slug = get_provider_slug(request)
     
     inv = crud.mark_invoice_paid(slug, invoice_id)
     if not inv:
@@ -591,6 +636,7 @@ def set_rate(
     request: Request,
     mode: str = Form(...),
     value: float = Form(...)
+
 ):
     """Set rate configuration."""
     require_admin(request)
@@ -619,6 +665,7 @@ def api_set_rate(
     request: Request,
     mode: str = Form(...),
     value: float = Form(...)
+
 ):
     """API: Set rate configuration."""
     require_admin(request)
@@ -657,8 +704,8 @@ def customer_portal_page(request: Request):
     return templates.TemplateResponse("customer_portal.html", {"request": request})
 
 
-@app.post("/api/auth/login")
-def customer_login(login_data: dict):
+@app.post("/api/customer/login")
+def customer_login(request: Request, login_data: dict):
     """Customer login endpoint."""
     username = login_data.get("username")
     password = login_data.get("password")
@@ -666,7 +713,7 @@ def customer_login(login_data: dict):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password required")
     
-    slug = get_provider_slug(provide_request())
+    slug = get_provider_slug(request)
     auth = crud.authenticate_customer(slug, username, password)
     
     if not auth:
@@ -819,7 +866,7 @@ def check_and_remind():
                     if customer:
                         # Send notification (simplified)
                         logger.info(f"Sending reminder for invoice {inv.get('id')} to customer {customer.get('id')}")
-                        crud.mark_reminder_sent(slug, inv.get("id"))
+                        crud.mark_reminder_sent(slug, inv.get('id'))
                         reminders_sent += 1
             
             if reminders_sent > 0:

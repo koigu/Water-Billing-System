@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://127.0.0.1:8000'
+import { API_BASE_URL } from './httpClient'
 
 async function parseResponse(res, method, path) {
   if (!res.ok) {
@@ -19,7 +19,7 @@ async function parseResponse(res, method, path) {
 }
 
 export async function customerLogin(username, password) {
-  const path = '/api/auth/login'
+  const path = '/api/customer/login'
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
     credentials: 'include',

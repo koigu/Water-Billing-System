@@ -92,8 +92,7 @@ function App() {
   useEffect(() => {
     const adminStatus = localStorage.getItem('is_admin')
     const superAdminStatus = localStorage.getItem('is_super_admin')
-    const token = localStorage.getItem('token')
-    setIsAuthenticated(adminStatus === 'true' && !!token)
+    setIsAuthenticated(adminStatus === 'true')
     setIsSuperAdmin(superAdminStatus === 'true')
   }, [])
 

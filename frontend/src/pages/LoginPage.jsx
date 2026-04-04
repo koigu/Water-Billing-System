@@ -16,17 +16,16 @@ export default function LoginPage({ onLogin }) {
 
     try {
       const response = await apiPost('/api/admin/login', { username, password })
-      const token = response.token || response.access_token
-
-      if (!token) {
-        throw new Error('Login succeeded but no token was returned')
-      }
 
       if (response.message === 'Login successful') {
         localStorage.setItem('is_admin', 'true')
         localStorage.setItem('is_super_admin', response.is_super_admin ? 'true' : 'false')
         localStorage.setItem('username', response.username || username)
-        localStorage.setItem('token', token)
+        if (response.token || response.access_token) {
+          localStorage.setItem('token', response.token || response.access_token)
+        } else {
+          localStorage.removeItem('token')
+        }
         if (response.provider_slug) {
           localStorage.setItem('provider_slug', response.provider_slug)
         } else {
