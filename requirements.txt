@@ -92,4 +92,6 @@ python-jose[cryptography]>=3.3.0
 
 # ====================
 itsdangerous>=2.2.0
+python-multipart>=0.0.9
+
 
