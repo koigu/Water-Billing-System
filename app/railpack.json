@@ -24,14 +24,13 @@
     "static-copy": {
       "inputs": [
         {
-          "step": "frontend-build",
-          "include": ["frontend/dist/**"]
+          "step": "frontend-build"
         }
       ],
       "commands": [
         {
-          "cmd": "sh -c 'if [ -d frontend/dist ]; then rm -rf static/* && cp -r frontend/dist/* static/; else echo \"No frontend/dist to copy, skipping\"; fi'",
-          "customName": "Copy frontend dist to static (if present)"
+          "cmd": "sh -c 'if [ -d frontend/dist ]; then cp -r frontend/dist/* static/; else echo \"No frontend dist, skipping copy\"; fi'",
+          "customName": "Copy frontend dist to static"
         }
       ]
     },
@@ -39,8 +38,13 @@
       "caches": ["pip"],
       "commands": [
         {
+<<<<<<< HEAD:railpack.json
           "cmd": "sh -c 'if [ -f ./requirements.txt ]; then python -m pip install --no-cache-dir -r ./requirements.txt; else echo \"requirements.txt not found in $(pwd)\"; ls -la .; exit 1; fi'",
           "customName": "Install backend deps from requirements.txt"
+=======
+          "cmd": "sh -c 'if [ -f /app/requirements_multitenant.txt ]; then python -m pip install --no-cache-dir -r /app/requirements_multitenant.txt; else echo \"requirements_multitenant.txt not found in $(pwd)\"; ls -la /app; exit 1; fi'",
+          "customName": "Install backend deps from requirements_multitenant.txt"
+>>>>>>> e81cfd96925445b5b400412f4c54d23b5448e794:app/railpack.json
         }
       ]
     }
@@ -50,6 +54,9 @@
     "paths": ["node_modules/.bin"],
     "inputs": [
       "...",
+      {
+        "step": "frontend-build"
+      },
       {
         "step": "static-copy"
       },

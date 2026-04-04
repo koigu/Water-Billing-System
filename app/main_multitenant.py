@@ -11,9 +11,13 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from typing import Optional, List
 from bson import ObjectId
 
-from app import mongodb_multitenant as mt_db
-from app import crud_providers
-from app import crud_multitenant as crud
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from app.mongodb_multitenant import mongodb_multitenant as mt_db
+from app.crud_providers import crud_providers
+from app.crud_multitenant import crud_multitenant as crud
 from app.middleware import ProviderContextMiddleware, ErrorHandlingMiddleware
 from app.models import (
     AdminLoginRequest,
