@@ -38,7 +38,8 @@ from app.models import (
     PaymentRecord,
 )
 
-logger = logging.getLogger("crud_providers")
+logger = logging.getLogger(__name__)
+logger.info("*** crud_providers.py module loading started ***")
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -1180,4 +1181,18 @@ __all__ = [
     "admin_user_exists",
     "is_provider_active",
 ]
+
+# ==================== CRUD PROVIDERS NAMESPACE ====================
+# Fix for main_multitenant.py import expectation
+
+class CrudProviders:
+    """Namespace object matching main_multitenant.py expectations."""
+    pass
+
+crud_providers = CrudProviders()
+
+# Dynamically attach all exported functions to the namespace object
+for func_name in __all__:
+    if func_name in globals():
+        setattr(crud_providers, func_name, globals()[func_name])
 

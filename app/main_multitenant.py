@@ -15,9 +15,9 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app import mongodb_multitenant as mt_db
-from app import crud_providers
-from app import crud_multitenant as crud
+from app.mongodb_multitenant import init_master_collections, shutdown_all_connections, is_master_connected
+from app.crud_providers import crud_providers
+import app.crud_multitenant as crud
 from app.middleware import ProviderContextMiddleware, ErrorHandlingMiddleware
 from app.models import (
     AdminLoginRequest,
@@ -36,11 +36,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger("uvicorn")
 APP_ENV = os.getenv("APP_ENV", "development").lower()
+
+#CORS Middlewear
 DEFAULT_ALLOWED_ORIGINS = [
+    "https://water-billing-system-5q5d.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "waterbillsystem-three.vercel.app",
 ]
 ALLOWED_ORIGINS = [
     origin.strip()
@@ -95,7 +99,7 @@ def startup_event():
     
     # Initialize master database
     try:
-        mt_db.init_master_collections()
+        init_master_collections()
         logger.info("Master database initialized")
     except Exception as e:
         logger.error(f"Failed to initialize master database: {e}")
@@ -122,7 +126,7 @@ def shutdown_event():
     #     sched.shutdown()
     
     try:
-        mt_db.shutdown_all_connections()
+        shutdown_all_connections()
     except Exception as e:
         logger.error(f"Error closing connections: {e}")
     
@@ -163,15 +167,7 @@ def health_check():
     """Health check endpoint (safe)."""
     master_connected = False
     try:
-        # call mt_db.is_master_connected() if available, otherwise safely return False
-        is_connected_fn = getattr(mt_db, "is_master_connected", None)
-        if callable(is_connected_fn):
-            try:
-                master_connected = bool(is_connected_fn())
-            except Exception:
-                master_connected = False
-        else:
-            master_connected = False
+        master_connected = bool(is_master_connected())
     except Exception:
         master_connected = False
 
@@ -180,7 +176,6 @@ def health_check():
         "timestamp": datetime.utcnow().isoformat(),
         "master_connected": master_connected,
     }
-
 
 # ==================== AUTH ROUTES ====================
 
@@ -891,5 +886,7 @@ def provide_request() -> Request:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Use Railway's PORT env variable
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 

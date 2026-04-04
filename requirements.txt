@@ -1,5 +1,5 @@
 # Multi-Tenant Water Billing System Dependencies
-# Install with: pip install -r requirements_multitenant.txt
+# Install with: pip install -r requirements.txt
 
 # Core Framework
 fastapi>=0.95.0
@@ -68,7 +68,7 @@ python-jose[cryptography]>=3.3.0
 #    venv\Scripts\activate     # Windows
 #
 # 2. Install dependencies:
-#    pip install -r requirements_multitenant.txt
+#    pip install -r requirements.txt
 #
 # 3. Copy .env.template to .env and configure:
 #    cp .env.template .env
@@ -84,12 +84,10 @@ python-jose[cryptography]>=3.3.0
 # ==================== ENVIRONMENT VARIABLES ====================
 #
 # Required:
-#   MONGODB_URL=mongodb://localhost:27017
-#   MASTER_DB_NAME=water_billing_master
+#   MONGODB_URL=
+#   MASTER_DB_NAME=
 #
 # Optional:
 #   JWT_SECRET=your-super-secret-jwt-key-change-in-production
-#   RATE_PER_UNIT=1.5
-#
-# ====================
 
+# ====================
