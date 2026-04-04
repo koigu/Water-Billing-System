@@ -1,5 +1,5 @@
- Multi-Tenant Water Billing System Dependencies
- Install with: pip install -r requirements_multitenant.txt
+# Multi-Tenant Water Billing System Dependencies
+# Install with: pip install -r requirements.txt
 
 # Core Framework
 fastapi>=0.95.0
