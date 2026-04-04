@@ -91,3 +91,7 @@ python-jose[cryptography]>=3.3.0
 #   JWT_SECRET=your-super-secret-jwt-key-change-in-production
 
 # ====================
+itsdangerous>=2.2.0
+python-multipart>=0.0.9
+
+
