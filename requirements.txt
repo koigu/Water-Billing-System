@@ -1,15 +1,92 @@
-fastapi==0.95.2
-uvicorn[standard]==0.22.0
-SQLAlchemy==1.4.50
-alembic==1.12.0
-pydantic==1.10.12
-Jinja2==3.1.2
-python-dotenv==1.0.0
-APScheduler==3.10.1
-email-validator==1.3.1
-requests==2.31.0
-twilio==8.0.0
-pytest==7.4.0
-pytest-cov==4.1.0
-pymongo==4.5.0
+ Multi-Tenant Water Billing System Dependencies
+ Install with: pip install -r requirements_multitenant.txt
+
+# Core Framework
+fastapi>=0.95.0
+uvicorn[standard]>=0.22.0
+pydantic>=1.10.0
+
+# Database
+pymongo>=4.5.0
+
+# Templating & Static Files
+Jinja2>=3.1.0
+
+# Environment Configuration
+python-dotenv>=1.0.0
+
+# Scheduling
+APScheduler>=3.10.0
+
+# Email Validation
+email-validator>=1.3.0
+
+# HTTP Requests
+requests>=2.31.0
+
+# SMS Notifications
+twilio>=8.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# ==================== MULTI-TENANT SPECIFIC ====================
+
+# Password Hashing (required for admin authentication)
 passlib[bcrypt]>=1.7.4
+
+# JWT Token Generation (for admin authentication)
+python-jose[cryptography]>=3.3.0
+
+# ==================== OPTIONAL DEPENDENCIES ====================
+
+# Production server (uncomment for production)
+# gunicorn>=21.0.0
+# uvicorn[standard]>=0.22.0  # Already listed above
+
+# Debug tools (uncomment for development)
+# debugpy>=1.6.0
+# ipdb>=0.13.0
+
+# Code quality (uncomment for development)
+# black>=23.0.0
+# isort>=5.12.0
+# flake8>=6.0.0
+# mypy>=1.0.0
+
+# Documentation (uncomment if needed)
+# mkdocs>=1.5.0
+# mkdocs-material>=9.0.0
+
+# ==================== INSTALLATION INSTRUCTIONS ====================
+#
+# 1. Create virtual environment (recommended):
+#    python -m venv venv
+#    source venv/bin/activate  # Linux/Mac
+#    venv\Scripts\activate     # Windows
+#
+# 2. Install dependencies:
+#    pip install -r requirements.txt
+#
+# 3. Copy .env.template to .env and configure:
+#    cp .env.template .env
+#
+# 4. Configure MongoDB connection in .env
+#
+# 5. Run provider setup:
+#    python app/setup_first_provider.py
+#
+# 6. Start the application:
+#    python -m uvicorn app.main_multitenant:app --reload --port 8000
+#
+# ==================== ENVIRONMENT VARIABLES ====================
+#
+# Required:
+#   MONGODB_URL=
+#   MASTER_DB_NAME=
+#
+# Optional:
+#   JWT_SECRET=your-super-secret-jwt-key-change-in-production
+
+# ====================
