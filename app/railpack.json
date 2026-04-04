@@ -29,7 +29,7 @@
       ],
       "commands": [
         {
-          "cmd": "sh -c 'if [ -d frontend/dist ]; then cp -r frontend/dist/* static/; else echo \"No frontend dist, skipping copy\"; fi'",
+          "cmd": "sh -c 'mkdir -p static && if [ -d frontend/dist ]; then cp -r frontend/dist/* static/; else echo \"No frontend dist, skipping copy\"; fi'",
           "customName": "Copy frontend dist to static"
         }
       ]

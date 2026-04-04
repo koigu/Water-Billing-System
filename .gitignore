@@ -67,7 +67,8 @@ TODO_*MD
 scripts/
 tests/
 templates/
-static/
+static/*
+!static/.gitkeep
 cookies.txt
 setup*.js
 
