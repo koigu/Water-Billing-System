@@ -37,8 +37,9 @@ logging.basicConfig(
 logger = logging.getLogger("uvicorn")
 APP_ENV = os.getenv("APP_ENV", "development").lower()
 
-#CORS Middlewear
+#CORS Middleware
 DEFAULT_ALLOWED_ORIGINS = [
+    CORSMiddleware,
     "https://water-billing-system-5q5d.onrender.com",
     "https://water-billing-system-b7jg.onrender.com",
     "http://localhost:5173",
