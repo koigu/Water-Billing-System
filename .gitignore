@@ -77,3 +77,10 @@ setup*.js
 *~
 Thumbs.db
 /app/venv
+TODO.md
+__pycache__/
+*.pyc
+.pylance/
+.vscode/settings.json
+.DS_Store
+

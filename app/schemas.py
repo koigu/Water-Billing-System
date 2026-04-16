@@ -22,12 +22,14 @@ class Customer(CustomerBase):
     id: int
     created_at: datetime
     # Make all fields optional to handle MongoDB documents
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 class CustomerWithReadings(Customer):
     readings: List["MeterReading"] = []
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 class MeterReadingCreate(BaseModel):
@@ -40,7 +42,8 @@ class MeterReading(BaseModel):
     reading_value: Optional[float] = None
     status: str = "recorded"
     recorded_at: datetime
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 class InvoiceCreate(BaseModel):
@@ -61,7 +64,8 @@ class Invoice(BaseModel):
     status: str = "pending"
     location: Optional[str] = None
     reminder_sent_at: Optional[datetime] = None
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 class RateConfigBase(BaseModel):
@@ -72,7 +76,8 @@ class RateConfigBase(BaseModel):
 class RateConfig(RateConfigBase):
     id: Optional[int] = None
     updated_at: Optional[datetime] = None
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 class RateChangeAudit(BaseModel):
@@ -81,7 +86,8 @@ class RateChangeAudit(BaseModel):
     mode: str
     value: float
     changed_at: datetime
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 # Customer Authentication Schemas
@@ -99,7 +105,8 @@ class CustomerAuth(CustomerAuthBase):
     customer_id: int
     created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 class CustomerLogin(BaseModel):
@@ -131,7 +138,8 @@ class Payment(PaymentBase):
     invoice_id: int
     customer_id: Optional[int] = None
     payment_date: Optional[datetime] = None
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 # Usage Alert Schemas
@@ -152,7 +160,8 @@ class UsageAlert(UsageAlertBase):
     created_at: Optional[datetime] = None
     is_read: int = 0
     resolved_at: Optional[datetime] = None
-    model_config = {"populate_by_name": True}
+    class Config:
+        populate_by_name = True
 
 
 # Analytics Schemas

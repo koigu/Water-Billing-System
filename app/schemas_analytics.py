@@ -3,7 +3,7 @@ Pydantic schemas for analytics service validation.
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, validator, ConfigDict
+from pydantic import BaseModel, Field, validator
 from enum import Enum
 
 
@@ -58,7 +58,9 @@ class UsageTrendResponse(UsageTrendBase):
     trend_direction: Optional[TrendDirection] = None
     trend_percentage: Optional[float] = None
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    class Config:
+        from_attributes = True
+        allow_population_by_field_name = True
 
 
 class UsageTrendAnalytics(BaseModel):
@@ -107,7 +109,9 @@ class PaymentAnalyticsResponse(PaymentAnalyticsBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    class Config:
+        from_attributes = True
+        allow_population_by_field_name = True
 
 
 class PaymentMethodAnalysis(BaseModel):
@@ -172,7 +176,9 @@ class CustomerBehaviorResponse(CustomerBehaviorBase):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    class Config:
+        from_attributes = True
+        allow_population_by_field_name = True
 
 
 class CustomerProfile(BaseModel):
@@ -209,192 +215,3 @@ class StaffMetricsBase(BaseModel):
     payments_collected: float = Field(..., ge=0)
     customers_added: int = Field(..., ge=0)
     readings_recorded: int = Field(..., ge=0)
-
-
-class StaffMetricsCreate(StaffMetricsBase):
-    """Schema for creating staff metrics."""
-    pass
-
-
-class StaffMetricsResponse(StaffMetricsBase):
-    """Schema for staff metrics response."""
-    id: Optional[str] = None
-    efficiency_score: float
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
-
-
-class StaffTrend(BaseModel):
-    """Schema for staff performance trend."""
-    staff_id: str
-    period: str
-    efficiency_score: float
-    invoices_generated: int
-    payments_collected: float
-    customers_added: int
-    readings_recorded: int
-    trend_direction: TrendDirection
-
-
-class TopPerformingStaff(BaseModel):
-    """Schema for top performing staff."""
-    staff_id: str
-    total_invoices: int
-    total_payments: float
-    total_customers: int
-    total_readings: int
-    avg_efficiency: float
-    months_active: int
-    rank: int
-
-
-# ==================== Reminder Config Schemas ====================
-
-class ReminderConfigBase(BaseModel):
-    """Base schema for reminder configuration."""
-    reminder_days: int = Field(..., ge=0, le=30)
-    auto_resend_invoice: bool = True
-    max_reminders: int = Field(..., ge=1, le=10)
-
-
-class ReminderConfigCreate(ReminderConfigBase):
-    """Schema for creating reminder config."""
-    updated_by: str = Field(..., min_length=1)
-
-
-class ReminderConfigResponse(ReminderConfigBase):
-    """Schema for reminder config response."""
-    updated_by: Optional[str] = None
-    updated_at: Optional[datetime] = None
-
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
-
-
-# ==================== Revenue Analytics Schemas ====================
-
-class RevenueAnalytics(BaseModel):
-    """Schema for revenue analytics."""
-    month: str
-    year: int
-    total_revenue: float
-    invoice_count: int
-    paid_amount: float
-    pending_amount: float
-    overdue_amount: float
-    collection_rate: float
-    avg_invoice_value: float
-    revenue_trend: TrendDirection
-    revenue_change_percentage: float
-
-
-class RevenueForecast(BaseModel):
-    """Schema for revenue forecast."""
-    predicted_month: str
-    predicted_revenue: float
-    confidence_low: float
-    confidence_high: float
-    confidence_score: float
-    factors: List[str] = []
-
-
-class RevenueSummary(BaseModel):
-    """Schema for revenue summary."""
-    current_month: str
-    current_month_revenue: float
-    previous_month_revenue: float
-    month_over_month_change: float
-    year_to_date_revenue: float
-    projected_monthly_revenue: float
-    forecast: List[RevenueForecast] = []
-
-
-# ==================== Data Quality Schemas ====================
-
-class DataQualityMetric(BaseModel):
-    """Schema for data quality metric."""
-    collection_name: str
-    metric_name: str
-    value: float
-    status: str  # "good", "warning", "critical"
-    threshold: float
-    description: str
-
-
-class DataQualityReport(BaseModel):
-    """Schema for data quality report."""
-    generated_at: datetime
-    overall_score: float
-    metrics: List[DataQualityMetric]
-    issues: List[str] = []
-    recommendations: List[str] = []
-
-
-class CollectionStats(BaseModel):
-    """Schema for collection statistics."""
-    collection_name: str
-    document_count: int
-    index_count: int
-    size_bytes: float
-    last_updated: Optional[datetime] = None
-
-
-# ==================== Dashboard Analytics Schemas ====================
-
-class DashboardAnalytics(BaseModel):
-    """Schema for dashboard analytics overview."""
-    total_customers: int
-    active_customers: int
-    inactive_customers: int
-    total_revenue: float
-    revenue_this_month: float
-    revenue_last_month: float
-    avg_payment_days: float
-    collection_rate: float
-    top_payment_methods: List[PaymentMethodAnalysis] = []
-    customer_segments: List[CustomerSegmentStats] = []
-    data_quality_score: float
-
-
-class TrendSummary(BaseModel):
-    """Schema for trend summary."""
-    metric_name: str
-    current_value: float
-    previous_value: float
-    change: float
-    change_percentage: float
-    trend: TrendDirection
-    prediction: Optional[float] = None
-
-
-# ==================== Pagination Schemas ====================
-
-class PaginationParams(BaseModel):
-    """Schema for pagination parameters."""
-    skip: int = Field(default=0, ge=0)
-    limit: int = Field(default=100, ge=1, le=1000)
-
-
-class PaginatedResponse(BaseModel):
-    """Schema for paginated response."""
-    data: List[Any]
-    total: int
-    skip: int
-    limit: int
-    has_more: bool
-
-
-# ==================== Date Range Schemas ====================
-
-class DateRangeParams(BaseModel):
-    """Schema for date range parameters."""
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-
-    @validator('end_date')
-    def validate_end_date(cls, v, values):
-        if v and 'start_date' in values and values['start_date'] and v < values['start_date']:
-            raise ValueError('end_date cannot be before start_date')
-        return v
-
