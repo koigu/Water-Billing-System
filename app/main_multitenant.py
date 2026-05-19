@@ -37,19 +37,23 @@ logging.basicConfig(
 logger = logging.getLogger("uvicorn")
 APP_ENV = os.getenv("APP_ENV", "development").lower()
 
-#CORS Middlewear
+#CORS Middleware
 DEFAULT_ALLOWED_ORIGINS = [
+    CORSMiddleware,
     "https://water-billing-system-5q5d.onrender.com",
     "https://water-billing-system-b7jg.onrender.com",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "waterbillsystem-three.vercel.app",
+    "http://waterbillsystem-three.vercel.app",
 ]
+logger.info(f"DEBUG CORS: DEFAULT_ALLOWED_ORIGINS={repr(DEFAULT_ALLOWED_ORIGINS)}, types={[type(o).__name__ for o in DEFAULT_ALLOWED_ORIGINS]}")
+valid_origins = [str(origin).strip() for origin in DEFAULT_ALLOWED_ORIGINS if isinstance(origin, str)]
+origins_str = ",".join(valid_origins)
 ALLOWED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("ALLOWED_ORIGINS", ",".join(DEFAULT_ALLOWED_ORIGINS)).split(",")
+    for origin in os.getenv("ALLOWED_ORIGINS", origins_str).split(",")
     if origin.strip()
 ]
 

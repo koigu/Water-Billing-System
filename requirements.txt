@@ -4,7 +4,7 @@
 # Core Framework
 fastapi>=0.95.0
 uvicorn[standard]>=0.22.0
-pydantic>=1.10.0
+pydantic==1.10.12
 
 # Database
 pymongo>=4.5.0
