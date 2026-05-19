@@ -10,7 +10,7 @@ import CustomerPortalPage from './pages/CustomerPortalPage'
 import LoginPage from './pages/LoginPage'
 import { apiPost } from './api/httpClient'
 
-function AppLayout({ children, onLogout, isSuperAdmin }) {
+function AppLayout({ children, onLogout, isSuperAdmin, hasProviderContext }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -29,18 +29,22 @@ function AppLayout({ children, onLogout, isSuperAdmin }) {
               <NavLink to="/super-admin/dashboard" className="nav-link">
                 Companies
               </NavLink>
-              <NavLink to="/admin/dashboard" className="nav-link">
-                Dashboard
-              </NavLink>
-              <NavLink to="/admin/customers" className="nav-link">
-                Customers
-              </NavLink>
-              <NavLink to="/admin/readings" className="nav-link">
-                Meter Readings
-              </NavLink>
-              <NavLink to="/admin/invoices" className="nav-link">
-                Invoices
-              </NavLink>
+              {hasProviderContext && (
+                <>
+                  <NavLink to="/admin/dashboard" className="nav-link">
+                    Dashboard
+                  </NavLink>
+                  <NavLink to="/admin/customers" className="nav-link">
+                    Customers
+                  </NavLink>
+                  <NavLink to="/admin/readings" className="nav-link">
+                    Meter Readings
+                  </NavLink>
+                  <NavLink to="/admin/invoices" className="nav-link">
+                    Invoices
+                  </NavLink>
+                </>
+              )}
             </>
           ) : (
             <>
@@ -88,17 +92,26 @@ function AppLayout({ children, onLogout, isSuperAdmin }) {
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [providerSlug, setProviderSlug] = useState('')
 
   useEffect(() => {
     const adminStatus = localStorage.getItem('is_admin')
     const superAdminStatus = localStorage.getItem('is_super_admin')
+    const savedProviderSlug = localStorage.getItem('provider_slug') || ''
     setIsAuthenticated(adminStatus === 'true')
     setIsSuperAdmin(superAdminStatus === 'true')
+    setProviderSlug(savedProviderSlug)
   }, [])
 
   const handleLogin = (session = {}) => {
     setIsAuthenticated(true)
     setIsSuperAdmin(!!session.is_super_admin)
+    setProviderSlug(session.provider_slug || localStorage.getItem('provider_slug') || '')
+  }
+
+  const handleSelectProviderWorkspace = (nextProviderSlug) => {
+    localStorage.setItem('provider_slug', nextProviderSlug)
+    setProviderSlug(nextProviderSlug)
   }
 
   const handleLogout = async () => {
@@ -110,10 +123,12 @@ function App() {
     localStorage.removeItem('is_admin')
     localStorage.removeItem('is_super_admin')
     localStorage.removeItem('username')
+    localStorage.removeItem('firebase_email')
     localStorage.removeItem('token')
     localStorage.removeItem('provider_slug')
     setIsAuthenticated(false)
     setIsSuperAdmin(false)
+    setProviderSlug('')
   }
 
   if (!isAuthenticated) {
@@ -128,14 +143,29 @@ function App() {
 
   if (isSuperAdmin) {
     return (
-      <AppLayout onLogout={handleLogout} isSuperAdmin>
+      <AppLayout onLogout={handleLogout} isSuperAdmin hasProviderContext={!!providerSlug}>
         <Routes>
           <Route path="/" element={<Navigate to="/super-admin/dashboard" replace />} />
-          <Route path="/super-admin/dashboard" element={<SuperAdminDashboardPage />} />
-          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-          <Route path="/admin/customers" element={<CustomersPage />} />
-          <Route path="/admin/readings" element={<ReadingsPage />} />
-          <Route path="/admin/invoices" element={<InvoicesPage />} />
+          <Route
+            path="/super-admin/dashboard"
+            element={<SuperAdminDashboardPage onSelectProviderWorkspace={handleSelectProviderWorkspace} />}
+          />
+          <Route
+            path="/admin/dashboard"
+            element={providerSlug ? <AdminDashboardPage /> : <Navigate to="/super-admin/dashboard" replace />}
+          />
+          <Route
+            path="/admin/customers"
+            element={providerSlug ? <CustomersPage /> : <Navigate to="/super-admin/dashboard" replace />}
+          />
+          <Route
+            path="/admin/readings"
+            element={providerSlug ? <ReadingsPage /> : <Navigate to="/super-admin/dashboard" replace />}
+          />
+          <Route
+            path="/admin/invoices"
+            element={providerSlug ? <InvoicesPage /> : <Navigate to="/super-admin/dashboard" replace />}
+          />
           <Route path="/portal" element={<CustomerPortalPage />} />
           <Route path="/login" element={<Navigate to="/super-admin/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/super-admin/dashboard" replace />} />
@@ -145,7 +175,7 @@ function App() {
   }
 
   return (
-    <AppLayout onLogout={handleLogout} isSuperAdmin={false}>
+    <AppLayout onLogout={handleLogout} isSuperAdmin={false} hasProviderContext={!!providerSlug}>
       <Routes>
         <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/admin/dashboard" element={<AdminDashboardPage />} />

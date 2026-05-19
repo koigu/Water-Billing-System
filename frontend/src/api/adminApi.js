@@ -72,6 +72,10 @@ export function fetchProviders() {
   return apiGet('/api/super-admin/providers')
 }
 
+export function selectProviderWorkspace(providerSlug) {
+  return apiPost('/api/super-admin/workspace', { provider_slug: providerSlug })
+}
+
 export function createProvider(payload) {
   return apiPost('/api/super-admin/providers', payload).then((res) => res.provider || res)
 }

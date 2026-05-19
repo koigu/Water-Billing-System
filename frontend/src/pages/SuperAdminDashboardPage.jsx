@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   activateProvider,
   createProvider,
   deactivateProvider,
   fetchProviders,
   fetchSuperAdminDashboard,
+  selectProviderWorkspace,
 } from '../api/adminApi'
 
 const EMPTY_PROVIDER_FORM = {
@@ -16,15 +18,17 @@ const EMPTY_PROVIDER_FORM = {
   rate_per_unit: '1.5',
 }
 
-export default function SuperAdminDashboardPage() {
+export default function SuperAdminDashboardPage({ onSelectProviderWorkspace }) {
   const [stats, setStats] = useState(null)
   const [providers, setProviders] = useState([])
   const [form, setForm] = useState(EMPTY_PROVIDER_FORM)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [actionBusy, setActionBusy] = useState('')
+  const [openingWorkspace, setOpeningWorkspace] = useState('')
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const navigate = useNavigate()
 
   const activeProviders = useMemo(
     () => providers.filter((provider) => provider.is_active !== false).length,
@@ -101,6 +105,26 @@ export default function SuperAdminDashboardPage() {
       setError(err.message || 'Failed to update provider status')
     } finally {
       setActionBusy('')
+    }
+  }
+
+  const openProviderWorkspace = async (provider) => {
+    if (!provider?.slug) return
+    setOpeningWorkspace(provider.slug)
+    setMessage('')
+    setError('')
+    try {
+      await selectProviderWorkspace(provider.slug)
+      if (onSelectProviderWorkspace) {
+        onSelectProviderWorkspace(provider.slug)
+      } else {
+        localStorage.setItem('provider_slug', provider.slug)
+      }
+      navigate('/admin/dashboard')
+    } catch (err) {
+      setError(err.message || 'Failed to open provider workspace')
+    } finally {
+      setOpeningWorkspace('')
     }
   }
 
@@ -194,6 +218,9 @@ export default function SuperAdminDashboardPage() {
 
       {error && <div style={{ color: '#dc3545', marginTop: '0.75rem' }}>Error: {error}</div>}
       {message && <div style={{ color: '#0f5132', marginTop: '0.75rem' }}>{message}</div>}
+      <div style={{ color: '#4f6281', marginTop: '0.75rem' }}>
+        Open a provider workspace from the table below when you want to view provider-specific dashboard data.
+      </div>
 
       <div className="table-wrapper">
         <table>
@@ -222,6 +249,15 @@ export default function SuperAdminDashboardPage() {
                 </td>
                 <td>{provider.created_at ? new Date(provider.created_at).toLocaleDateString() : '-'}</td>
                 <td>
+                  <button
+                    type="button"
+                    className="button button--small"
+                    disabled={openingWorkspace === provider.slug}
+                    onClick={() => openProviderWorkspace(provider)}
+                    style={{ marginRight: '0.5rem' }}
+                  >
+                    {openingWorkspace === provider.slug ? 'Opening...' : 'Open Workspace'}
+                  </button>
                   <button
                     type="button"
                     className="button button--small button--ghost"

@@ -38,6 +38,8 @@ class ProviderContextMiddleware(BaseHTTPMiddleware):
         "/login",
         "/api/auth/login",
         "/api/auth/register",
+        "/api/admin/firebase-login",
+        "/api/public/providers",
     }
     
     def __init__(self, app, allowed_subdomains: list = None):
@@ -90,8 +92,10 @@ class ProviderContextMiddleware(BaseHTTPMiddleware):
             return response
             
         except HTTPException as e:
-            # Re-raise HTTP exceptions
-            raise
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"detail": e.detail}
+            )
         except Exception as e:
             logger.error(f"Error in provider middleware: {e}")
             return JSONResponse(
@@ -112,6 +116,8 @@ class ProviderContextMiddleware(BaseHTTPMiddleware):
             r"^/docs",
             r"^/redoc",
             r"^/openapi",
+            r"^/api/super-admin",
+            r"^/super-admin",
         ]
         
         for pattern in exempt_patterns:
@@ -185,18 +191,45 @@ class ProviderContextMiddleware(BaseHTTPMiddleware):
     def _validate_provider(self, slug: str) -> tuple[bool, dict]:
         """Validate provider exists and is active."""
         try:
+            try:
+                from app.firebase_firestore import get_provider as get_firestore_provider
+                provider = get_firestore_provider(slug)
+                if provider is not None:
+                    if not provider.get("isActive", provider.get("is_active", True)):
+                        return False, provider
+
+                    # Normalize Firestore provider shape for downstream code that expects Mongo-style keys.
+                    normalized = {
+                        **provider,
+                        "id": provider.get("id", provider.get("slug", slug)),
+                        "slug": provider.get("slug", slug),
+                        "name": provider.get("name"),
+                        "contact_email": provider.get("contactEmail", provider.get("contact_email")),
+                        "contact_phone": provider.get("contactPhone", provider.get("contact_phone")),
+                        "is_active": provider.get("isActive", provider.get("is_active", True)),
+                        "address": provider.get("address"),
+                        "branding": provider.get("branding", {}),
+                        "settings": provider.get("settings", {
+                            "rate_per_unit": provider.get("ratePerUnit", 1.5),
+                            "currency": provider.get("currency", "KES"),
+                        }),
+                    }
+                    return True, normalized
+            except Exception as e:
+                logger.warning(f"Firestore provider validation failed for {slug}: {e}")
+
             from app.mongodb_multitenant import get_provider
-            
+
             provider = get_provider(slug)
-            
+
             if provider is None:
                 return False, None
-            
+
             if not provider.get("is_active", True):
                 return False, provider
-            
+
             return True, provider
-            
+
         except Exception as e:
             logger.error(f"Error validating provider {slug}: {e}")
             return False, None
@@ -223,6 +256,7 @@ class ProviderAuthenticationMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.bypass_routes = {
             "/api/admin/login",
+            "/api/admin/firebase-login",
             "/api/admin/logout",
             "/api/customer/login",
             "/api/auth/login",

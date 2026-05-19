@@ -185,6 +185,11 @@ def get_super_admin_by_username(username: str) -> Optional[Dict[str, Any]]:
     return get_super_admin_collection().find_one({"username": username})
 
 
+def get_super_admin_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Get super admin by email."""
+    return get_super_admin_collection().find_one({"email": email})
+
+
 def get_super_admin_by_id(admin_id: int) -> Optional[Dict[str, Any]]:
     """Get super admin by ID."""
     return get_super_admin_collection().find_one({"id": admin_id})
@@ -709,6 +714,16 @@ def get_provider_detail(provider: Dict[str, Any]) -> ProviderDetailResponse:
     admin_count = mt_db.get_admin_users_collection().count_documents(
         {"provider_id": provider["id"], "is_active": True}
     )
+    customer_count = 0
+    invoice_count = 0
+
+    try:
+        provider_db = mt_db.get_provider_db(provider["slug"])
+        customer_count = provider_db["customers"].count_documents({})
+        invoice_count = provider_db["invoices"].count_documents({})
+    except Exception:
+        # If the provider DB is unavailable, keep dashboard counts at zero.
+        pass
     
     return ProviderDetailResponse(
         id=provider["id"],
@@ -723,7 +738,9 @@ def get_provider_detail(provider: Dict[str, Any]) -> ProviderDetailResponse:
         created_at=provider.get("created_at", datetime.utcnow()),
         updated_at=provider.get("updated_at"),
         database_name=provider["database_name"],
-        admin_user_count=admin_count
+        admin_user_count=admin_count,
+        customer_count=customer_count,
+        invoice_count=invoice_count,
     )
 
 
@@ -793,6 +810,61 @@ def get_admin_user_by_username(provider_id: int, username: str) -> Optional[Dict
         "provider_id": provider_id,
         "username": username
     })
+
+
+def get_admin_user_by_email(provider_id: int, email: str) -> Optional[Dict[str, Any]]:
+    """Get admin user by email within a provider."""
+    return mt_db.get_admin_users_collection().find_one({
+        "provider_id": provider_id,
+        "email": email
+    })
+
+
+def resolve_provider_slug_for_admin_email(email: str) -> Optional[str]:
+    """
+    Resolve a provider slug from an admin email when it maps to one active provider.
+    """
+    matches = list(
+        mt_db.get_admin_users_collection().find(
+            {"email": email, "is_active": True},
+            {"provider_id": 1}
+        ).limit(2)
+    )
+
+    provider_ids = {match.get("provider_id") for match in matches if match.get("provider_id")}
+    if len(provider_ids) != 1:
+        return None
+
+    provider = mt_db.get_provider_by_id(next(iter(provider_ids)))
+    if not provider or not provider.get("is_active", True):
+        return None
+
+    return provider.get("slug")
+
+
+def resolve_provider_slug_for_admin_username(username: str) -> Optional[str]:
+    """
+    Resolve a provider slug from an admin username when it maps to one active provider.
+
+    Returns None when the username is missing, ambiguous across providers, or the
+    resolved provider is inactive/missing.
+    """
+    matches = list(
+        mt_db.get_admin_users_collection().find(
+            {"username": username, "is_active": True},
+            {"provider_id": 1}
+        ).limit(2)
+    )
+
+    provider_ids = {match.get("provider_id") for match in matches if match.get("provider_id")}
+    if len(provider_ids) != 1:
+        return None
+
+    provider = mt_db.get_provider_by_id(next(iter(provider_ids)))
+    if not provider or not provider.get("is_active", True):
+        return None
+
+    return provider.get("slug")
 
 
 def list_admin_users(provider_id: int, active_only: bool = True) -> List[Dict[str, Any]]:

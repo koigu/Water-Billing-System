@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { customerLogin, fetchPortalData } from '../api/customerApi'
+import { apiGet } from '../api/httpClient'
 
 export default function CustomerPortalPage() {
+  const [providerSlug, setProviderSlug] = useState(localStorage.getItem('provider_slug') || '')
+  const [providers, setProviders] = useState([])
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [token, setToken] = useState(localStorage.getItem('customer_token'))
@@ -59,8 +62,12 @@ export default function CustomerPortalPage() {
     e.preventDefault()
     setError(null)
     try {
-      const res = await customerLogin(username, password)
+      const trimmedProviderSlug = providerSlug.trim()
+      const res = await customerLogin(username, password, trimmedProviderSlug)
       const nextToken = res.access_token
+      if (trimmedProviderSlug) {
+        localStorage.setItem('provider_slug', trimmedProviderSlug)
+      }
       setToken(nextToken)
       localStorage.setItem('customer_token', nextToken)
       setPassword('')
@@ -77,10 +84,16 @@ export default function CustomerPortalPage() {
   }
 
   useEffect(() => {
+    apiGet('/api/public/providers')
+      .then((data) => setProviders(Array.isArray(data) ? data : []))
+      .catch(() => setProviders([]))
+  }, [])
+
+  useEffect(() => {
     if (!token) return
     setLoadingPortal(true)
     setError(null)
-    fetchPortalData(token)
+    fetchPortalData(token, providerSlug)
       .then((data) => setPortalData(data))
       .catch((err) => {
         setError(err.message)
@@ -88,7 +101,7 @@ export default function CustomerPortalPage() {
         setToken(null)
       })
       .finally(() => setLoadingPortal(false))
-  }, [token])
+  }, [token, providerSlug])
 
   return (
     <div className="customer-portal">
@@ -102,6 +115,25 @@ export default function CustomerPortalPage() {
       {!token && (
         <form onSubmit={handleLogin} className="card customer-portal__login">
           <h3 style={{ marginTop: 0 }}>Customer Sign In</h3>
+          <label htmlFor="customer-provider">Water company</label>
+          <input
+            id="customer-provider"
+            name="provider_slug"
+            className="input"
+            placeholder="Provider slug"
+            value={providerSlug}
+            onChange={(e) => setProviderSlug(e.target.value)}
+            list="customer-provider-options"
+            autoComplete="organization"
+            required
+          />
+          <datalist id="customer-provider-options">
+            {providers.map((provider) => (
+              <option key={provider.slug} value={provider.slug}>
+                {provider.name}
+              </option>
+            ))}
+          </datalist>
           <label htmlFor="customer-username">Username</label>
           <input
             id="customer-username"

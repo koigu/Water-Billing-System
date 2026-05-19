@@ -532,7 +532,8 @@ def init_master_collections():
     admin_users.create_index("is_active")
     
     # provider_counter collection
-    master_db["provider_counter"].create_index("_id", unique=True)
+    # MongoDB already maintains a unique _id index automatically.
+    master_db["provider_counter"]
     
     # super_admins collection
     super_admins = master_db["super_admins"]

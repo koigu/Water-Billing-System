@@ -8,6 +8,7 @@ __pycache__/
 .env
 .env.test
 .env.local
+firebase-service-account.json
 
 # Database
 *.sqlite3
