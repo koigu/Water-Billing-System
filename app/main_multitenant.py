@@ -17,7 +17,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.mongodb_multitenant import init_master_collections, shutdown_all_connections, is_master_connected
 from app.crud_providers import crud_providers
-import app.crud_multitenant as crud
 from app.middleware import ProviderContextMiddleware, ErrorHandlingMiddleware
 from app.models import (
     AdminLoginRequest,
@@ -36,6 +35,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("uvicorn")
 APP_ENV = os.getenv("APP_ENV", "development").lower()
+DATA_BACKEND = os.getenv("DATA_BACKEND", "mongo").lower()
+
+if DATA_BACKEND == "firestore":
+    import app.crud_firestore as crud
+else:
+    import app.crud_multitenant as crud
 
 #CORS Middleware
 DEFAULT_ALLOWED_ORIGINS = [
@@ -103,11 +108,14 @@ def startup_event():
     logger.info("Starting multi-tenant water billing system...")
     
     # Initialize master database
-    try:
-        init_master_collections()
-        logger.info("Master database initialized")
-    except Exception as e:
-        logger.error(f"Failed to initialize master database: {e}")
+    if DATA_BACKEND == "firestore":
+        logger.info("DATA_BACKEND=firestore; skipping MongoDB master initialization")
+    else:
+        try:
+            init_master_collections()
+            logger.info("Master database initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize master database: {e}")
     
     try:
         scheduler = BackgroundScheduler()
@@ -130,10 +138,11 @@ def shutdown_event():
     # if sched:
     #     sched.shutdown()
     
-    try:
-        shutdown_all_connections()
-    except Exception as e:
-        logger.error(f"Error closing connections: {e}")
+    if DATA_BACKEND != "firestore":
+        try:
+            shutdown_all_connections()
+        except Exception as e:
+            logger.error(f"Error closing connections: {e}")
     
     logger.info("Application shutdown complete")
 
@@ -235,8 +244,29 @@ async def read_request_payload(request: Request) -> dict:
     return dict(form)
 
 
+def send_invoice_sms(customer: dict, invoice: dict) -> dict:
+    """Send an invoice SMS to a customer's phone number."""
+    if not customer:
+        return {"success": False, "error": "Customer not found"}
+    if not customer.get("phone"):
+        return {"success": False, "error": "Customer has no phone number"}
+
+    try:
+        from app.notify import send_invoice_message
+        sent = send_invoice_message(customer, invoice, method="sms")
+        if sent:
+            return {"success": True}
+        return {"success": False, "error": "SMS provider did not confirm delivery"}
+    except Exception as e:
+        logger.error(f"Invoice SMS failed: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
 def ensure_mongo_provider_for_workspace(provider_slug: str, provider: dict) -> dict:
     """Ensure provider-scoped billing routes have a Mongo tenant database."""
+    if DATA_BACKEND == "firestore":
+        return provider
+
     existing = crud_providers.get_provider(provider_slug)
     if existing:
         return existing
@@ -274,15 +304,19 @@ def ensure_mongo_provider_for_workspace(provider_slug: str, provider: dict) -> d
 def health_check():
     """Health check endpoint (safe)."""
     master_connected = False
-    try:
-        master_connected = bool(is_master_connected())
-    except Exception:
-        master_connected = False
+    if DATA_BACKEND == "firestore":
+        master_connected = True
+    else:
+        try:
+            master_connected = bool(is_master_connected())
+        except Exception:
+            master_connected = False
 
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
         "master_connected": master_connected,
+        "data_backend": DATA_BACKEND,
     }
 
 
@@ -990,7 +1024,15 @@ def api_generate_invoice(request: Request, customer_id: int):
         location=customer.get("location") if customer else None
     )
     
-    return to_json_safe({"message": "Invoice generated", "invoice": inv, "invoice_id": inv["id"], "amount": amount})
+    sms_result = send_invoice_sms(customer, inv)
+    return to_json_safe({
+        "message": "Invoice generated",
+        "invoice": inv,
+        "invoice_id": inv["id"],
+        "amount": amount,
+        "sms_sent": sms_result.get("success", False),
+        "sms_error": sms_result.get("error"),
+    })
 
 
 @app.post("/api/admin/invoices/{invoice_id}/pay")
@@ -1004,6 +1046,121 @@ def api_pay_invoice(request: Request, invoice_id: int):
         raise HTTPException(status_code=404, detail="Invoice not found")
     
     return to_json_safe({"message": "Invoice marked as paid", "invoice": inv})
+
+
+@app.post("/api/admin/invoices/{invoice_id}/send-reminder")
+def api_send_invoice_reminder(request: Request, invoice_id: int):
+    """API: Send an invoice reminder by SMS."""
+    require_admin(request)
+    slug = get_provider_slug(request)
+
+    invoice = crud.get_invoice(slug, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    customer = crud.get_customer(slug, invoice.get("customer_id"))
+    sms_result = send_invoice_sms(customer, invoice)
+    if not sms_result.get("success"):
+        raise HTTPException(status_code=502, detail=sms_result.get("error") or "Failed to send SMS")
+
+    invoice = crud.mark_reminder_sent(slug, invoice_id) or invoice
+    return to_json_safe({
+        "message": "Invoice reminder sent",
+        "invoice": invoice,
+        "sms_sent": True,
+    })
+
+
+@app.post("/api/admin/reminders/bulk-send")
+async def api_bulk_send_invoice_reminders(request: Request):
+    """API: Send invoice reminders by SMS for multiple invoices."""
+    require_admin(request)
+    slug = get_provider_slug(request)
+    payload = await read_request_payload(request)
+    invoice_ids = payload.get("invoice_ids") or []
+    if not isinstance(invoice_ids, list):
+        raise HTTPException(status_code=400, detail="invoice_ids must be a list")
+
+    sent = []
+    failed = []
+    for raw_invoice_id in invoice_ids:
+        invoice_id = raw_invoice_id
+        try:
+            invoice_id = int(raw_invoice_id)
+            invoice = crud.get_invoice(slug, invoice_id)
+            if not invoice:
+                failed.append({"invoice_id": invoice_id, "error": "Invoice not found"})
+                continue
+            customer = crud.get_customer(slug, invoice.get("customer_id"))
+            sms_result = send_invoice_sms(customer, invoice)
+            if sms_result.get("success"):
+                crud.mark_reminder_sent(slug, invoice_id)
+                sent.append(invoice_id)
+            else:
+                failed.append({"invoice_id": invoice_id, "error": sms_result.get("error")})
+        except Exception as e:
+            failed.append({"invoice_id": invoice_id, "error": str(e)})
+
+    return to_json_safe({
+        "message": "Bulk reminder run complete",
+        "sent_count": len(sent),
+        "failed_count": len(failed),
+        "sent_ids": sent,
+        "failed": failed,
+    })
+
+
+@app.post("/api/admin/invoices/bulk-generate")
+async def api_bulk_generate_invoices(request: Request):
+    """API: Generate invoices and send each invoice by SMS where possible."""
+    require_admin(request)
+    slug = get_provider_slug(request)
+    payload = await read_request_payload(request)
+    customer_ids = payload.get("customer_ids") or []
+    if not isinstance(customer_ids, list):
+        raise HTTPException(status_code=400, detail="customer_ids must be a list")
+
+    created = []
+    failed = []
+    for raw_customer_id in customer_ids:
+        customer_id = raw_customer_id
+        try:
+            customer_id = int(raw_customer_id)
+            rate = crud.get_effective_rate(slug)
+            calc = crud.calculate_amount_from_readings(slug, customer_id, rate)
+            if not calc:
+                failed.append({"customer_id": customer_id, "error": "Not enough readings to calculate invoice"})
+                continue
+            amount, billing_from, billing_to = calc
+            due_date = datetime.utcnow() + timedelta(days=15)
+            customer = crud.get_customer(slug, customer_id)
+            inv = crud.create_invoice(
+                slug,
+                customer_id,
+                amount,
+                due_date,
+                billing_from=billing_from,
+                billing_to=billing_to,
+                location=customer.get("location") if customer else None,
+            )
+            sms_result = send_invoice_sms(customer, inv)
+            created.append({
+                "customer_id": customer_id,
+                "invoice_id": inv.get("id"),
+                "amount": amount,
+                "sms_sent": sms_result.get("success", False),
+                "sms_error": sms_result.get("error"),
+            })
+        except Exception as e:
+            failed.append({"customer_id": customer_id, "error": str(e)})
+
+    return to_json_safe({
+        "message": "Bulk invoice generation complete",
+        "created_count": len(created),
+        "failed_count": len(failed),
+        "created": created,
+        "failed": failed,
+    })
 
 
 # ==================== RATE ROUTES ====================
@@ -1445,7 +1602,15 @@ def check_and_remind():
     logger.info("Running scheduled reminder job...")
     
     # Get all active providers
-    providers = crud_providers.list_providers(active_only=True)
+    if DATA_BACKEND == "firestore":
+        try:
+            from app.firebase_firestore import list_providers as list_firestore_providers
+            providers = list_firestore_providers(active_only=True)
+        except Exception as e:
+            logger.error(f"Could not list Firestore providers for reminders: {e}")
+            return
+    else:
+        providers = crud_providers.list_providers(active_only=True)
     
     for provider in providers:
         slug = provider["slug"]
@@ -1465,23 +1630,28 @@ def check_and_remind():
             if not auto_resend:
                 continue
             
-            # Find invoices to remind
-            db = crud.get_provider_db(slug)
-            if not db:
-                continue
-            
             cutoff = datetime.utcnow() - timedelta(days=reminder_days)
-            overdue_invoices = list(db["invoices"].find({"status": "overdue"}))
+            overdue_invoices = [
+                invoice
+                for invoice in crud.list_invoices(slug, limit=10000)
+                if invoice.get("status") == "overdue"
+            ]
             
             reminders_sent = 0
             for inv in overdue_invoices:
                 if inv.get("due_date") <= cutoff and not inv.get("reminder_sent_at"):
                     customer = crud.get_customer(slug, inv.get("customer_id"))
                     if customer:
-                        # Send notification (simplified)
-                        logger.info(f"Sending reminder for invoice {inv.get('id')} to customer {customer.get('id')}")
-                        crud.mark_reminder_sent(slug, inv.get('id'))
-                        reminders_sent += 1
+                        sms_result = send_invoice_sms(customer, inv)
+                        if sms_result.get("success"):
+                            logger.info(f"Sent reminder for invoice {inv.get('id')} to customer {customer.get('id')}")
+                            crud.mark_reminder_sent(slug, inv.get('id'))
+                            reminders_sent += 1
+                        else:
+                            logger.warning(
+                                f"Failed to send reminder for invoice {inv.get('id')}: "
+                                f"{sms_result.get('error')}"
+                            )
             
             if reminders_sent > 0:
                 logger.info(f"Sent {reminders_sent} reminders for provider {slug}")

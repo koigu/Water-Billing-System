@@ -64,6 +64,7 @@ class ProviderFactory:
                 "username": os.getenv("AFRICAS_TALKING_USERNAME"),
                 "is_sandbox": os.getenv("AFRICAS_TALKING_IS_SANDBOX", "true").lower() == "true",
                 "supports_whatsapp": os.getenv("AFRICAS_TALKING_SUPPORTS_WHATSAPP", "false").lower() == "true",
+                "sender_id": os.getenv("AFRICAS_TALKING_SENDER_ID"),
             }
         
         else:

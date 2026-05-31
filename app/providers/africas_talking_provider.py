@@ -59,7 +59,7 @@ class AfricasTalkingProvider(BaseNotificationProvider):
             headers = {
                 "Accept": "application/json",
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Authorization": f"Bearer {self.config['api_key']}"
+                "apiKey": self.config["api_key"],
             }
 
             data = {
@@ -67,6 +67,8 @@ class AfricasTalkingProvider(BaseNotificationProvider):
                 "to": phone_number,
                 "message": message,
             }
+            if self.config.get("sender_id"):
+                data["from"] = self.config["sender_id"]
 
             resp = requests.post(url, data=data, headers=headers, timeout=10)
 
@@ -146,7 +148,7 @@ class AfricasTalkingProvider(BaseNotificationProvider):
             headers = {
                 "Accept": "application/json",
                 "Content-Type": "application/x-www-form-urlencoded",
-                "Authorization": f"Bearer {self.config['api_key']}"
+                "apiKey": self.config["api_key"],
             }
 
             data = {
@@ -215,7 +217,7 @@ class AfricasTalkingProvider(BaseNotificationProvider):
             url = f"{self.base_url}/version1/user"
             headers = {
                 "Accept": "application/json",
-                "Authorization": f"Bearer {self.config['api_key']}"
+                "apiKey": self.config["api_key"],
             }
             
             resp = requests.get(url, headers=headers, timeout=10)

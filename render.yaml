@@ -7,4 +7,16 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12
+      - key: DATA_BACKEND
+        value: firestore
+      - key: SMS_PROVIDER
+        value: africas_talking
+      - key: AFRICAS_TALKING_USERNAME
+        sync: false
+      - key: AFRICAS_TALKING_API_KEY
+        sync: false
+      - key: AFRICAS_TALKING_IS_SANDBOX
+        value: "false"
+      - key: AFRICAS_TALKING_SENDER_ID
+        sync: false
     autoDeploy: false
