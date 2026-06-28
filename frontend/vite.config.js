@@ -6,6 +6,11 @@ const proxyTarget = process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8000'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: 'index.html',
+    },
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,
@@ -17,5 +22,7 @@ export default defineConfig({
       },
     },
   },
-
 })
+
+
+
