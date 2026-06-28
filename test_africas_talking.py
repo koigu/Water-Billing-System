@@ -133,7 +133,7 @@ def test_send_sms_mock():
     provider = AfricasTalkingProvider(config)
     
     # Mock successful response
-    with patch.object(provider.session, 'post') as mock_post:
+    with patch("app.providers.africas_talking_provider.requests.post") as mock_post:
         mock_response = MagicMock()
         mock_response.status_code = 201
         mock_response.json.return_value = {
@@ -146,6 +146,7 @@ def test_send_sms_mock():
         mock_post.return_value = mock_response
         
         result = provider.send_sms("+254715257415", "Test message")
+
         
         assert result.success == True
         assert result.message_id == "ATXid123456789"
@@ -153,7 +154,7 @@ def test_send_sms_mock():
         print("✓ Successful SMS mock works")
     
     # Mock API error
-    with patch.object(provider.session, 'post') as mock_post:
+    with patch("app.providers.africas_talking_provider.requests.post") as mock_post:
         mock_response = MagicMock()
         mock_response.status_code = 400
         mock_response.text = "Invalid request"
@@ -163,9 +164,9 @@ def test_send_sms_mock():
         assert result.success == False
         assert "API error" in result.error
         print("✓ API error handling works")
-    
+
     # Mock recipient error
-    with patch.object(provider.session, 'post') as mock_post:
+    with patch("app.providers.africas_talking_provider.requests.post") as mock_post:
         mock_response = MagicMock()
         mock_response.status_code = 201
         mock_response.json.return_value = {
@@ -184,6 +185,7 @@ def test_send_sms_mock():
         print("✓ Recipient error handling works")
 
 
+
 def test_send_whatsapp_mock():
     """Test WhatsApp sending with mocked responses."""
     print("\n" + "="*60)
@@ -193,7 +195,7 @@ def test_send_whatsapp_mock():
     config = {"api_key": "test_key", "username": "test_user", "supports_whatsapp": True}
     provider = AfricasTalkingProvider(config)
     
-    with patch.object(provider.session, 'post') as mock_post:
+    with patch("app.providers.africas_talking_provider.requests.post") as mock_post:
         mock_response = MagicMock()
         mock_response.status_code = 201
         mock_response.json.return_value = {
@@ -246,7 +248,7 @@ def test_get_balance_mock():
     config = {"api_key": "test_key", "username": "test_user"}
     provider = AfricasTalkingProvider(config)
     
-    with patch.object(provider.session, 'get') as mock_get:
+    with patch("app.providers.africas_talking_provider.requests.get") as mock_get:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
